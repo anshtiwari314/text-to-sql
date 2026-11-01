@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String?          @db.VarChar(255)
+  email          String           @unique @db.VarChar(255)
+  image          String?
+  last_login     DateTime?        @default(now())
+  
+  databases      SavedDatabase[]
+  chats          ChatHistory[]
+
+  @@map("users") // Maps the Prisma model to the exact lowercase table name
+}
+
+model SavedDatabase {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String           @db.Uuid
+  name           String?          @db.VarChar(100)
+  engine         String?          @db.VarChar(50)
+  host           String?          @db.VarChar(255)
+  port           Int?
+  db_username    String?          @db.VarChar(100)
+  db_password    String?
+  db_name        String?          @db.VarChar(100)
+
+  user           User             @relation(fields: [user_id], references: [id])
+  chats          ChatHistory[]
+
+  @@map("saved_databases")
+}
+
+model ChatHistory {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String           @db.Uuid
+  database_id    String           @db.Uuid
+  prompt         String
+  generated_sql  String?
+  created_at     DateTime?        @default(now())
+
+  user           User             @relation(fields: [user_id], references: [id])
+  database       SavedDatabase    @relation(fields: [database_id], references: [id])
+
+  @@map("chat_histories")
+}
