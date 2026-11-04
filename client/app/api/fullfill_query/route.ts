@@ -1,33 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { query } from '@/lib/db';
+import { ensureChatTables } from '@/lib/ensureChatTables';
 import { callFlask } from '@/lib/flask';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/authOptions';
 
-/**
- * STEP 2: the user asked a question in the chat.
- *
- * One route does everything:
- *   credentials -> Flask /api/fullfill_query (LLM + SQL + data) -> save history -> reply
- *
- * Body: { prompt, databaseId, history, schema? }
- *   schema  = optional browser cache; Flask always re-fetches schema from the user's DB
- *   history = last few chat messages, so the LLM remembers the conversation
- */
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const { prompt, databaseId, history = [] } = await req.json();
+    const { prompt, databaseId, history = [], chatSessionId = null } = await req.json();
 
     if (!prompt?.trim() || !databaseId) {
-      return NextResponse.json({ error: "prompt and databaseId are required" }, { status: 400 });
+      return NextResponse.json({ error: 'prompt and databaseId are required' }, { status: 400 });
     }
 
-    // 1. Get the credentials of the selected database
     const dbResult = await query(
       `SELECT engine, host, port, db_name, db_username, db_password
        FROM saved_databases WHERE id = $1 AND user_id = $2`,
@@ -35,10 +25,11 @@ export async function POST(req: Request) {
     );
 
     if (dbResult.rows.length === 0) {
-      return NextResponse.json({ error: "Database not found" }, { status: 404 });
+      return NextResponse.json({ error: 'Database not found' }, { status: 404 });
     }
 
-    // 2. Flask generates the SQL, runs it, and returns SQL + data (or a question)
+    await ensureChatTables();
+
     const { ok, status, data } = await callFlask('/fullfill_query', {
       prompt,
       databaseId,
@@ -46,25 +37,49 @@ export async function POST(req: Request) {
       credentials: dbResult.rows[0],
     });
     if (!ok) {
-      const errorMessage = data.error || "Flask failed";
-      // The LLM provider is misconfigured (bad/missing API key)
-      const llmProviderFailed = status === 500 && !errorMessage.includes("connect");
+      const errorMessage = data.error || 'Flask failed';
+      const llmProviderFailed = status === 500 && !errorMessage.includes('connect');
       return NextResponse.json({ error: errorMessage }, { status: llmProviderFailed ? 502 : status });
     }
 
-    // 3. Save the prompt + generated SQL to chat history (skip clarifications)
-    if (data.sql) {
-      const saved = await query(
-        `INSERT INTO chat_histories (user_id, database_id, prompt, generated_sql)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [session.user.id, databaseId, prompt, data.sql]
+    let sessionId = chatSessionId as string | null;
+    if (!sessionId) {
+      const title = prompt.trim().slice(0, 80) || 'Chat';
+      const created = await query(
+        `INSERT INTO chat_sessions (user_id, database_id, title)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [session.user.id, databaseId, title]
       );
-      data.chatId = saved.rows[0].id;
+      sessionId = created.rows[0].id;
+    } else {
+      await query(
+        `UPDATE chat_sessions SET updated_at = now() WHERE id = $1 AND user_id = $2`,
+        [sessionId, session.user.id]
+      );
     }
 
+    await query(
+      `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, 'user', $2)`,
+      [sessionId, prompt.trim()]
+    );
+
+    const aiContent = data.message || data.error || 'Done';
+    await query(
+      `INSERT INTO chat_messages (session_id, role, content, sql, columns, rows)
+       VALUES ($1, 'ai', $2, $3, $4, $5)`,
+      [
+        sessionId,
+        aiContent,
+        data.sql ?? null,
+        JSON.stringify(data.columns ?? []),
+        JSON.stringify(data.rows ?? []),
+      ]
+    );
+
+    data.chatSessionId = sessionId;
     return NextResponse.json(data, { status: 200 });
   } catch (error) {
-    console.error("Error in /api/fullfill_query:", error);
-    return NextResponse.json({ error: "Failed to process the question" }, { status: 500 });
+    console.error('Error in /api/fullfill_query:', error);
+    return NextResponse.json({ error: 'Failed to process the question' }, { status: 500 });
   }
 }

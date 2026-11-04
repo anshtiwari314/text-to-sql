@@ -2,71 +2,131 @@
 
 Agents: read this file at the start of related tasks and update it when architecture or fixes change.
 
-## File graph (navigation)
+## Product routes (Next.js)
+
+| URL | Purpose |
+|-----|--------|
+| `/` | Public landing (`client/public/landing.html` iframe) |
+| `/auth` | Sign in / sign up / forgot password |
+| `/app` | Main SQL AI app (session required; redirects to `/auth` if logged out) |
+| `/login` | Redirect → `/auth` |
+| `/reset-password?token=…` | Set new password from email link |
+
+Landing **Sign in** / **Get Started** links → `/auth`. After OAuth or email login, callback → **`/app`**.
+
+## Auth (Next.js + Postgres)
+
+- **NextAuth** (`client/app/api/auth/[...nextauth]/route.ts`): Google and GitHub only if env vars set; email **Credentials** always.
+- **OAuth** upserts `users` (name, email, image); **credentials** use `password_hash` on `users` (`ensureAuthTables`).
+- **Sign up**: `POST /api/auth/signup` (bcrypt hash).
+- **Forgot**: `POST /api/auth/forgot` → Nodemailer reset link → `password_resets` table (1h token).
+- **Reset**: `POST /api/auth/reset` with token + new password.
+- **SessionProvider** in `StoreProvider` for client `signIn()`.
+- Google redirect URI: `{NEXTAUTH_URL}/api/auth/callback/google`.
+
+**Client env** (see `client/.env.example`): `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_*`, `GITHUB_*`, `DATABASE_URL`, `FLASK_URL`, `SMTP_*` (`SMTP_FROM` = visible From address; defaults to `SMTP_USER`).
+
+**Server env** (`server/.env`): `OPENROUTER_API_KEY=sk-or-...` **no extra quotes** (``""key""`` breaks dotenv). Loaded via `server/core/config.py` absolute path.
+
+## UI structure
+
+**Sidebar**
+- **Chat** → New Chat, History
+- **Database** → **Configuration** (data source cards, add/edit), **Schemas** (table browser)
+
+**Configuration** (`db_list`, `DatabaseList.tsx`): cards open connection editor; no schema dropdown on cards.
+
+**Schemas** (`db_schemas`, `DatabaseSchemasView.tsx`): DB cards → Flask `/api/schema` → `parseSchemaDdl` → **table dropdown** + CREATE TABLE DDL per table.
+
+**Chat**
+- Generate → `POST /api/fullfill_query` with `databaseId`, `chatSessionId`, `history`.
+- Messages + sessions in Postgres: `chat_sessions`, `chat_messages` (`ensureChatTables` on first use).
+- History: `GET /api/chats`, `GET /api/chats/[id]` — no mock data.
+
+**Redux** (`appSlice`): `activeDbId`, `schemaTables`, `schemasViewDbId`, `activeChatSessionId`, `messages`.
+
+## Text-to-SQL pipeline
 
 ```mermaid
 flowchart LR
-  ChatView["client/components/ChatView.tsx"]
-  NextFQ["client/app/api/fullfill_query/route.ts"]
-  NextSchema["client/app/api/schema/route.ts"]
-  PG[(Postgres saved_databases)]
-  ChatSvc["server/services/chat_service.py"]
-  DbSvc["server/services/db_service.py"]
-  MySqlSchema["server/services/mysql_schema.py"]
-  LlmSvc["server/services/llm_service.py"]
-  UserDB[(User DB e.g. W3Schools MySQL)]
+  Landing["/ landing"]
+  Auth["/auth"]
+  App["/app ChatView"]
+  NextFQ["/api/fullfill_query"]
+  PG[(App Postgres)]
+  Flask["Flask :8000"]
+  UserDB[(User MySQL/PG)]
 
-  ChatView --> NextFQ
+  Landing --> Auth
+  Auth --> App
+  App --> NextFQ
   NextFQ --> PG
-  NextFQ --> ChatSvc
-  NextSchema --> PG
-  NextSchema --> DbSvc
-  ChatSvc --> DbSvc
-  ChatSvc --> LlmSvc
-  DbSvc --> MySqlSchema
-  DbSvc --> UserDB
-  LlmSvc -->|"system prompt {schema}"| LlmSvc
+  NextFQ --> Flask
+  Flask --> UserDB
 ```
+
+1. Next loads **credentials** from `saved_databases` for the signed-in user.
+2. Flask **`fetch_schema`**: `MetaData.reflect()` → CREATE TABLE DDL (`schema_reflect_ddl.py`) — aligned with **`Ai-course/3-text-to-sql/agent.py`**.
+3. LLM: OpenRouter, JSON `{ sql, explanation }` (`llm_service.py`, `llm_json_parse.py` with fallbacks).
+4. **`w3schools_sql.py`**: PascalCase table names for MySQL before execute.
+5. Response: SQL + rows to client; Next saves user + AI rows to `chat_messages`.
+
+## Reference: course agent.py
+
+- Path: `~/Desktop/practise-and-make/Ai-course/3-text-to-sql/agent.py`
+- MySQL host `192.168.1.42:5246`, database **`w3schools`** (not `mysql` system DB).
+- Saved connection in app must match: engine **MySQL**, `db_name=w3schools`.
+
+## Known pitfalls (resolved)
+
+| Issue | Cause | Fix |
+|-------|--------|-----|
+| OPENROUTER missing at runtime | `""key""` in `.env` | Unquoted `KEY=value`; `config.py` loads `server/.env` by path |
+| Empty schema / LLM “which table has country?” | Wrong PG schema introspection or wrong MySQL `db_name` | DDL reflect; point `db_name` at real DB |
+| JSON parse errors from model | Markdown / non-strict JSON | `llm_json_parse.py` fallbacks |
+| Google OAuth broken | Empty GitHub provider / wrong callback | Conditional providers; `/auth`; callback `/app` |
+| GitHub `redirect_uri` not associated | Callback URL missing in **OAuth App** (not GitHub App) | Register `{NEXTAUTH_URL}/api/auth/callback/github` exactly |
+| Landing Sign in stuck on `/` | Links opened inside landing iframe | `/auth` links use `target="_top"` in `landing.html` |
+| Auth inputs invisible | Dark `prefers-color-scheme` + inherited text color | `bg-white text-slate-900` + labels on `/auth` |
+| Forgot password no email | Only sent when `password_hash` set (OAuth-only users skipped) | Send for any registered email; reset sets `password_hash` |
+
+## Key files
 
 | Path | Role |
 |------|------|
-| `client/components/ChatView.tsx` | Generate → `/api/fullfill_query` |
-| `client/app/api/fullfill_query/route.ts` | Load credentials from Postgres, call Flask |
-| `client/app/api/schema/route.ts` | Verify connection, return schema text |
-| `server/services/chat_service.py` | `fetch_schema` → LLM → `run_sql` |
-| `server/services/db_service.py` | Schema introspection + SQL execution |
-| `server/services/schema_reflect_ddl.py` | MetaData.reflect → CREATE TABLE DDL (same as course agent.py) |
-| `server/services/llm_json_parse.py` | Parse `{sql, explanation}` from model |
-| `server/services/w3schools_sql.py` | PascalCase W3Schools MySQL table names |
-| `server/services/llm_service.py` | System prompt embeds full schema text |
-| `server/core/config.py` | `server/.env`, OpenRouter key |
-| `server/tests/test_w3schools_schema.py` | Country column + LLM prompt checks |
-| `tests/test_cases.md` | Human-readable test case log |
-| `server/data/sessions/<id>/*.log` | Per-session code change audit trail |
+| `client/app/page.tsx` | Landing iframe |
+| `client/app/auth/page.tsx` | Auth page |
+| `client/app/app/page.tsx` | Protected app shell |
+| `client/components/AuthView.tsx` | Google/GitHub/email UI |
+| `client/lib/parseSchemaDdl.ts` | Split DDL into tables |
+| `client/lib/ensureChatTables.ts` | `chat_sessions` / `chat_messages` |
+| `client/lib/ensureAuthTables.ts` | `password_hash`, `password_resets` |
+| `client/lib/sendResetEmail.ts` | Nodemailer reset mail |
+| `client/app/api/chats/*` | Chat list + load |
+| `client/app/api/fullfill_query/route.ts` | Flask proxy + persist messages |
+| `server/services/chat_service.py` | Orchestrate schema → LLM → SQL |
+| `server/services/schema_reflect_ddl.py` | DDL for LLM |
+| `server/tests/test_flow.py`, `test_w3schools_schema.py` | Offline Flask tests (SQLite + fake LLM) |
 
-## Text-to-SQL flow
-- **Next.js**: auth, saved DB credentials in Postgres, proxies to Flask.
-- **Flask**: connects to user DB, **always** `fetch_schema()` before LLM, OpenRouter, read-only SQL.
-- **Env**: `OPENROUTER_API_KEY` only in `server/.env` (`KEY=value`, no extra quotes).
+## Tests & logs
 
-## Reference implementation (works for user)
-- Path: `Ai-course/3-text-to-sql/agent.py`
-- MySQL `192.168.1.42:5246`, database **`w3schools`**, `mysql+pymysql`
-- Schema: `MetaData().reflect()` → `CreateTable` DDL strings
-- LLM: `ChatOpenAI.invoke`, JSON with `sql` + `explanation`, OpenRouter headers
-- **App must use the same engine/DB** — PostgreSQL in Data Sources ≠ agent.py MySQL
+- Human test log: `tests/test_cases.md`
+- Session audit: `server/data/sessions/<session_id>/*.log` (rule1)
 
-## W3Schools / ClassicModels
-- Sample DB has `customers.Country` (and `City`, `Address`, etc.).
-- If the LLM asks “which table has country?”, schema text was empty — not an LLM-only bug.
-- **PostgreSQL**: `db_name` = database; tables are in schema **`public`**. Fixed in `postgres_schema.py`.
-- **MySQL**: `mysql_schema.py` + `information_schema`.
+## Operational
 
-## Recent fixes
-- Chat Generate uses header-selected DB id; Flask always refreshes schema.
-- OpenRouter key: dotenv failed on `""key""`; load `server/.env` by absolute path.
-- Postgres + MySQL schema introspection; country-question override when `Country` column exists.
+- Restart **Flask** after `server/.env` or server code changes.
+- Restart **Next** after `client/.env` or auth changes.
+- Flask logs: `schema_reflect_ddl`, `fullfill_query`, `llm_service`.
 
-## Operational notes
-- Restart Flask after `.env` or server code changes.
-- Flask logs: `postgres_schema`, `mysql_schema`, `fullfill_query` table counts.
+## Last updated
+
+2026-11-04 — Landing palette on `/auth` and `/app`
+- Shared `LandingGlow`: indigo / cyan / blue blobs on `slate-950`.
+- Auth form is dark (explicit `text-slate-100` inputs). Logo and CTAs use indigo→cyan, same as landing.
+- App sidebar, header, and chat composer use that glow and gradient. Violet accents replaced with cyan.
+
+2026-11-04 — OAuth UI, landing auth links, authOptions module
+- Landing `/auth` links: `target="_top"` (iframe was trapping navigation).
+- Auth: Google/GitHub SVG icons; OAuth error hints + callback URLs from `/api/auth/providers`.
+- `lib/authOptions.ts` + `lib/oauthEnv.ts`; `force-dynamic` on `/auth` and `/app` (Next 16 session).

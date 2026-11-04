@@ -9,16 +9,20 @@ interface SidebarProps {
 
 export default function Sidebar({ activeView, setActiveView }: SidebarProps) {
   const [isChatDropdownOpen, setIsChatDropdownOpen] = useState(true);
-
+  const [isDbOpen, setIsDbOpen] = useState(true);
   const isChatActive = activeView === "chat" || activeView === "chat_history";
+  const isDbActive =
+    activeView === "db_list" || activeView === "db_schemas" || activeView === "new_db" || activeView === "db_details";
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col shadow-xl z-20">
-      <div className="p-5 border-b border-slate-800 flex items-center gap-2">
-        <div className="bg-gradient-to-br from-indigo-500 to-violet-500 p-1.5 rounded-lg text-white">
-          <Zap size={20} />
+    <aside className="z-20 flex w-64 flex-col border-r border-slate-800/60 bg-slate-950 shadow-xl">
+      <div className="flex items-center gap-2 border-b border-slate-800/60 p-5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white">
+          <Zap size={18} />
         </div>
-        <span className="font-bold text-xl text-white tracking-tight">SQL AI</span>
+        <span className="text-xl font-bold tracking-tight text-white">
+          SQL<span className="text-indigo-400">AI</span>
+        </span>
       </div>
       
       <nav className="flex-1 p-4 space-y-2">
@@ -61,17 +65,43 @@ export default function Sidebar({ activeView, setActiveView }: SidebarProps) {
           )}
         </div>
         
-        {/* Databases Navigation */}
-        <button 
-          onClick={() => setActiveView("db_list")}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium ${
-            activeView !== "chat" && activeView !== "chat_history"
-              ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20" 
-              : "text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-transparent"
-          }`}
-        >
-          <Database size={18} /> Databases
-        </button>
+        <div>
+          <button
+            onClick={() => setIsDbOpen(!isDbOpen)}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium ${
+              isDbActive
+                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20"
+                : "text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <Database size={18} /> Database
+            </span>
+            {isDbOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
+          {isDbOpen && (
+            <div className="mt-1 flex flex-col gap-1 pl-4 border-l-2 border-slate-800 ml-4">
+              <button
+                onClick={() => setActiveView("db_list")}
+                className={`px-3 py-2 rounded-md text-sm text-left ${
+                  activeView === "db_list" || activeView === "new_db" || activeView === "db_details"
+                    ? "text-indigo-400 bg-slate-800"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                Configuration
+              </button>
+              <button
+                onClick={() => setActiveView("db_schemas")}
+                className={`px-3 py-2 rounded-md text-sm text-left ${
+                  activeView === "db_schemas" ? "text-indigo-400 bg-slate-800" : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                Schemas
+              </button>
+            </div>
+          )}
+        </div>
       </nav>
     </aside>
   );

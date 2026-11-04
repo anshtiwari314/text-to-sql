@@ -1,4 +1,24 @@
-export type ViewState = "chat" | "chat_history" | "db_list" | "new_db" | "db_details";
+export type ViewState =
+  | 'chat'
+  | 'chat_history'
+  | 'db_list'
+  | 'db_schemas'
+  | 'new_db'
+  | 'db_details';
+
+export interface ParsedTableSchema {
+  name: string;
+  ddl: string;
+}
+
+export interface SavedChatSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  database_id: string;
+  db_name: string;
+}
 
 export interface DatabaseConnection {
   id: string; // Changed from number to string to support Postgres UUIDs

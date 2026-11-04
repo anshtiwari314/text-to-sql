@@ -18,7 +18,7 @@ export default function Header({ user }: HeaderProps) {
   const [isDbDropdownOpen, setIsDbDropdownOpen] = useState(false);
 
   return (
-    <header className="bg-slate-950/60 backdrop-blur-md border-b border-slate-800 h-16 flex items-center justify-between px-8 shrink-0 z-30 shadow-sm w-full relative">
+    <header className="relative z-30 flex h-16 w-full shrink-0 items-center justify-between border-b border-slate-800/60 bg-slate-950/70 px-8 shadow-sm backdrop-blur-lg">
       <div className="relative">
         <button
           onClick={() => setIsDbDropdownOpen(!isDbDropdownOpen)}

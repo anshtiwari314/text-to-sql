@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryAI - Chat with your Database</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Custom Configuration for Tailwind -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for terminal */
+        .terminal-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 1); 
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 1); 
+            border-radius: 4px;
+        }
+        .typing-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1.2em;
+            background-color: #38bdf8;
+            vertical-align: middle;
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-50 font-sans antialiased selection:bg-indigo-500/30 overflow-x-hidden">
+
+    <!-- Background Ambient Glows -->
+    <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
+        <div class="absolute top-[20%] right-[-10%] w-96 h-96 bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob" style="animation-delay: 2s;"></div>
+        <div class="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-blue-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob" style="animation-delay: 4s;"></div>
+    </div>
+
+    <!-- Header Navigation -->
+    <nav class="fixed w-full z-50 top-0 border-b border-slate-800/60 bg-slate-950/70 backdrop-blur-lg">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <!-- Logo -->
+            <div class="flex items-center gap-2 cursor-pointer">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                    </svg>
+                </div>
+                <span class="text-xl font-bold tracking-tight text-white">Query<span class="text-indigo-400">AI</span></span>
+            </div>
+
+            <!-- Desktop Links -->
+            <div class="hidden md:flex items-center gap-8">
+                <a href="#features" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">Features</a>
+                <a href="#" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">Documentation</a>
+                <a href="#" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">Pricing</a>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div class="hidden md:flex items-center gap-4">
+                <a href="/auth" target="_top" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">Sign in</a>
+                <a href="/auth" target="_top" class="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 transition-all transform hover:-translate-y-0.5">
+                    Start Free Trial
+                </a>
+            </div>
+
+            <!-- Mobile Menu Button (Icon only for visual completeness) -->
+            <button class="md:hidden text-slate-300 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="relative z-10 pt-32 pb-16 lg:pt-48 lg:pb-32">
+        <!-- Hero Section -->
+        <section class="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+            
+            <!-- Hero Text -->
+            <div class="flex-1 text-center lg:text-left animate-fade-in">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm font-medium mb-6">
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    v2.0 Model Now Available
+                </div>
+                
+                <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-500">
+                    Chat with your <br class="hidden lg:block">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Database.</span>
+                </h1>
+                
+                <p class="text-lg lg:text-xl text-slate-400 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                    Stop writing complex queries by hand. QueryAI turns natural language into highly optimized SQL in milliseconds. Empower your entire team to explore data instantly.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                    <a href="/auth" target="_top" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/25 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Get Started Free
+                    </a>
+                    <a href="#" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 hover:bg-slate-800 text-white font-semibold transition-all flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Read the Docs
+                    </a>
+                </div>
+                <p class="mt-4 text-sm text-slate-500">No credit card required. Connects to PostgreSQL, MySQL, and Snowflake.</p>
+            </div>
+
+            <!-- Terminal Mockup -->
+            <div class="flex-1 w-full w-full max-w-2xl animate-fade-in" style="animation-delay: 0.2s;">
+                <div class="relative group rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 p-[1px] shadow-2xl shadow-indigo-900/20">
+                    <!-- Glow border effect -->
+                    <div class="absolute inset-0 bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-2xl opacity-20 group-hover:opacity-40 blur transition duration-500"></div>
+                    
+                    <div class="relative rounded-2xl bg-slate-950 overflow-hidden flex flex-col h-[400px]">
+                        <!-- Window Controls -->
+                        <div class="flex items-center px-4 py-3 bg-slate-900/50 border-b border-slate-800 backdrop-blur-sm">
+                            <div class="flex gap-2">
+                                <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                            </div>
+                            <div class="mx-auto flex items-center gap-2 text-xs font-mono text-slate-500">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                nlp-to-sql-engine
+                            </div>
+                        </div>
+
+                        <!-- Code Content -->
+                        <div class="flex-1 p-5 font-mono text-[13px] md:text-sm overflow-y-auto terminal-scroll leading-relaxed">
+                            
+                            <!-- User Input -->
+                            <div class="mb-5">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-indigo-400 font-semibold">user@query-ai</span>
+                                    <span class="text-slate-500">~</span>
+                                </div>
+                                <div class="text-slate-300 flex items-start gap-2">
+                                    <span class="text-indigo-500 font-bold">$</span>
+                                    <span>"Show me total sales by region for last month"</span>
+                                </div>
+                            </div>
+
+                            <!-- System Loading -->
+                            <div class="mb-5 pl-4 border-l-2 border-slate-800">
+                                <div class="text-slate-500 flex items-center gap-2 mb-1">
+                                    <svg class="w-4 h-4 animate-spin text-cyan-500" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Retrieving schema context via RAG...
+                                </div>
+                                <div class="text-slate-500 flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    Dialect selected: <span class="text-cyan-400">PostgreSQL 15</span>
+                                </div>
+                            </div>
+
+                            <!-- SQL Output -->
+                            <div class="mb-2">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-green-400 font-semibold">system@query-ai</span>
+                                    <span class="text-slate-500">~</span>
+                                </div>
+                                <div class="bg-slate-900/80 rounded-lg p-4 border border-slate-800 text-slate-300 shadow-inner">
+                                    <div><span class="text-pink-400">SELECT</span> region,</div>
+                                    <div class="ml-4"><span class="text-pink-400">SUM</span>(sales_amount) <span class="text-pink-400">AS</span> total_sales</div>
+                                    <div><span class="text-pink-400">FROM</span> enterprise_sales</div>
+                                    <div><span class="text-pink-400">WHERE</span> order_date &gt;= <span class="text-yellow-300">DATE_TRUNC</span>(<span class="text-green-300">'month'</span>, <span class="text-pink-400">CURRENT_DATE</span> - <span class="text-pink-400">INTERVAL</span> <span class="text-green-300">'1 month'</span>)</div>
+                                    <div class="ml-4"><span class="text-pink-400">AND</span> order_date &lt; <span class="text-yellow-300">DATE_TRUNC</span>(<span class="text-green-300">'month'</span>, <span class="text-pink-400">CURRENT_DATE</span>)</div>
+                                    <div><span class="text-pink-400">GROUP BY</span> region</div>
+                                    <div><span class="text-pink-400">ORDER BY</span> total_sales <span class="text-pink-400">DESC</span>;</div>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 flex items-center gap-2 text-slate-400">
+                                <span>Query generated in <span class="text-cyan-400">142ms</span></span>
+                                <span class="typing-cursor"></span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="mt-32 border-t border-slate-800/60 bg-slate-900/20 backdrop-blur-sm py-24">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center max-w-3xl mx-auto mb-16">
+                    <h2 class="text-3xl lg:text-4xl font-bold mb-4">Engineered for Modern Data Teams</h2>
+                    <p class="text-slate-400 text-lg">Our architecture is built for security, accuracy, and speed. We don't just generate text; we generate valid, performant queries tailored to your specific schema.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    
+                    <!-- Feature 1 -->
+                    <div class="bg-slate-900/50 p-8 rounded-2xl border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800/50 transition duration-300 group">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">PostgreSQL Native</h3>
+                        <p class="text-slate-400 leading-relaxed">
+                            Deeply integrated with Postgres dialects. Naturally supports complex joins, CTEs, window functions, and JSONB operations right out of the box.
+                        </p>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="bg-slate-900/50 p-8 rounded-2xl border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800/50 transition duration-300 group">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">RAG-powered Schema Retrieval</h3>
+                        <p class="text-slate-400 leading-relaxed">
+                            We index your metadata, foreign keys, and comments. Our Vector DB retrieves only the relevant schema context to ensure zero hallucinations.
+                        </p>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="bg-slate-900/50 p-8 rounded-2xl border border-slate-800 hover:border-green-500/50 hover:bg-slate-800/50 transition duration-300 group">
+                        <div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Secure Execution</h3>
+                        <p class="text-slate-400 leading-relaxed">
+                            Your database credentials never leave your infrastructure. Deploy via Docker in your VPC, or use our secure SOC2-compliant cloud router.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Supported Environments Section -->
+        <section class="mt-32 max-w-7xl mx-auto px-6 border-t border-slate-800/60 pt-24">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-3xl lg:text-4xl font-bold mb-4">Deploy Anywhere. Connect Anything.</h2>
+                <p class="text-slate-400 text-lg">Seamlessly integrate with your existing infrastructure, whether you're entirely in the cloud or running on-premise.</p>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- AWS -->
+                <div class="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-orange-500/50 transition-colors">
+                    <span class="text-orange-400 font-semibold mb-2">AWS</span>
+                    <span class="text-xs text-slate-500 text-center">Native RDS</span>
+                </div>
+                <!-- Azure -->
+                <div class="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-blue-500/50 transition-colors">
+                    <span class="text-blue-400 font-semibold mb-2">Azure</span>
+                    <span class="text-xs text-slate-500 text-center">SQL Database</span>
+                </div>
+                <!-- Local -->
+                <div class="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition-colors">
+                    <span class="text-emerald-400 font-semibold mb-2">Localhost</span>
+                    <span class="text-xs text-slate-500 text-center">Docker / Bare Metal</span>
+                </div>
+                <!-- Postgres -->
+                <div class="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-indigo-500/50 transition-colors">
+                    <span class="text-indigo-400 font-semibold mb-2">PostgreSQL</span>
+                    <span class="text-xs text-slate-500 text-center">v10 - v16</span>
+                </div>
+                <!-- MySQL -->
+                <div class="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-cyan-500/50 transition-colors">
+                    <span class="text-cyan-400 font-semibold mb-2">MySQL</span>
+                    <span class="text-xs text-slate-500 text-center">v5.7 / v8.0</span>
+                </div>
+                <!-- SQLite -->
+                <div class="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-slate-400/50 transition-colors">
+                    <span class="text-slate-300 font-semibold mb-2">SQLite</span>
+                    <span class="text-xs text-slate-500 text-center">File-based</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Connect Local DB Section -->
+        <section class="mt-32 max-w-7xl mx-auto px-6">
+            <div class="flex flex-col lg:flex-row items-center gap-16">
+                <div class="flex-1 lg:pr-10">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-500/20 mb-6 border border-emerald-500/30">
+                        <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+                    </div>
+                    <h2 class="text-3xl font-bold mb-4">Securely Connect Your Local Database</h2>
+                    <p class="text-slate-400 text-lg mb-6 leading-relaxed">
+                        Don't want to expose your database to the internet? Use our lightweight CLI agent to create a secure, outbound-only tunnel to your local or VPC-bound databases.
+                    </p>
+                    <ul class="space-y-4 mb-8 text-slate-300">
+                        <li class="flex items-center gap-3">
+                            <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div> 
+                            No firewall changes required
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div> 
+                            End-to-end encryption
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div> 
+                            Connects in under 30 seconds
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="flex-1 w-full max-w-xl">
+                    <div class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shadow-2xl">
+                        <div class="bg-slate-800/80 px-4 py-3 flex items-center gap-2 border-b border-slate-700/50 backdrop-blur">
+                            <div class="flex gap-2">
+                                <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                            </div>
+                            <span class="ml-4 text-xs text-slate-500 font-mono">bash - queryai-agent</span>
+                        </div>
+                        <div class="p-6 font-mono text-[13px] md:text-sm leading-relaxed">
+                            <div class="text-slate-300 mb-2">
+                                <span class="text-emerald-400 font-bold">$</span> npm install -g queryai-cli
+                            </div>
+                            <div class="text-slate-500 mb-5">+ queryai-cli@2.1.0 added in 1.4s</div>
+                            
+                            <div class="text-slate-300 mb-2">
+                                <span class="text-emerald-400 font-bold">$</span> queryai link postgresql://user:pass@localhost:5432/db
+                            </div>
+                            <div class="text-slate-400 space-y-1">
+                                <div><span class="text-cyan-400">►</span> Analyzing schema... <span class="text-green-400">Done (0.8s)</span></div>
+                                <div><span class="text-cyan-400">►</span> Establishing secure tunnel... <span class="text-green-400">Connected</span></div>
+                                <br>
+                                <div><span class="text-green-400 font-semibold">Success!</span> Your local DB is now securely connected.</div>
+                                <div class="flex items-center gap-2 mt-2 p-2 rounded bg-slate-950 border border-slate-800">
+                                    <span class="text-slate-500">Agent ID:</span> 
+                                    <span class="text-indigo-400">agt_9f82h3b1v9</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- API Endpoint Section -->
+        <section class="mt-32 mb-16 max-w-7xl mx-auto px-6">
+            <div class="flex flex-col-reverse lg:flex-row items-center gap-16">
+                <div class="flex-1 w-full max-w-xl">
+                    <div class="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shadow-2xl relative group">
+                        <!-- Glow effect -->
+                        <div class="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl opacity-0 group-hover:opacity-20 blur-xl transition duration-500 pointer-events-none"></div>
+
+                        <div class="relative z-10">
+                            <div class="flex items-center px-4 py-3 bg-slate-800/80 border-b border-slate-700/50 gap-4 backdrop-blur">
+                                <span class="text-xs font-mono text-purple-300 bg-purple-500/20 px-2.5 py-1 rounded border border-purple-500/30">cURL</span>
+                                <span class="text-xs font-mono text-slate-500 hover:text-slate-300 cursor-pointer transition-colors">Node.js</span>
+                                <span class="text-xs font-mono text-slate-500 hover:text-slate-300 cursor-pointer transition-colors">Python</span>
+                            </div>
+                            <div class="p-5 font-mono text-[13px] md:text-sm leading-relaxed overflow-x-auto terminal-scroll">
+<pre><code class="text-slate-300"><span class="text-pink-400">curl</span> -X POST https://api.queryai.com/v1/query \
+  -H <span class="text-green-300">"Authorization: Bearer qai_YOUR_API_KEY"</span> \
+  -H <span class="text-green-300">"Content-Type: application/json"</span> \
+  -d '{
+    <span class="text-indigo-300">"agent_id"</span>: <span class="text-green-300">"agt_9f82h3b1v9"</span>,
+    <span class="text-indigo-300">"query"</span>: <span class="text-green-300">"Who are the top 5 customers by LTV?"</span>,
+    <span class="text-indigo-300">"execute"</span>: <span class="text-orange-300">true</span>
+  }'</code></pre>
+                            </div>
+                            <!-- Response Mockup -->
+                            <div class="border-t border-slate-800 bg-slate-950 p-5 font-mono text-[12px] md:text-[13px] text-slate-400 overflow-x-auto terminal-scroll">
+                                <div class="text-slate-500 mb-2">// Response - HTTP 200 OK</div>
+<pre><code>{
+  <span class="text-indigo-300">"status"</span>: <span class="text-green-300">"success"</span>,
+  <span class="text-indigo-300">"sql_generated"</span>: <span class="text-green-300">"SELECT name, SUM(amount) as ltv FROM..."</span>,
+  <span class="text-indigo-300">"data"</span>: [
+    {<span class="text-indigo-300">"name"</span>: <span class="text-green-300">"Acme Corp"</span>, <span class="text-indigo-300">"ltv"</span>: <span class="text-orange-300">145000</span>},
+    {<span class="text-indigo-300">"name"</span>: <span class="text-green-300">"Globex"</span>, <span class="text-indigo-300">"ltv"</span>: <span class="text-orange-300">112000</span>}
+  ]
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 lg:pl-10">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-purple-500/20 mb-6 border border-purple-500/30">
+                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    </div>
+                    <h2 class="text-3xl font-bold mb-4">Generate APIs Instantly</h2>
+                    <p class="text-slate-400 text-lg mb-6 leading-relaxed">
+                        Turn natural language into an executable API endpoint in seconds. Build internal tools, reporting dashboards, or customer-facing analytics without writing a single line of backend SQL logic.
+                    </p>
+                    <div class="flex flex-col sm:flex-row items-start gap-4 mt-8">
+                        <a href="#" class="px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2">
+                            View API Docs
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </a>
+                        <a href="#" class="px-6 py-3 rounded-lg bg-transparent border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white transition-colors">
+                            See Examples
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-950 pt-16 pb-8 relative z-10">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                <!-- Brand -->
+                <div class="md:col-span-1">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                            </svg>
+                        </div>
+                        <span class="text-lg font-bold text-white">Query<span class="text-indigo-400">AI</span></span>
+                    </div>
+                    <p class="text-sm text-slate-500">Democratizing data access through natural language processing and modern AI.</p>
+                </div>
+                
+                <!-- Links -->
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Product</h4>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Features</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Integrations</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Pricing</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Changelog</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Documentation</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">API Reference</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Blog</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Community</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Company</h4>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">About Us</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Careers</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-indigo-400 transition-colors">Terms of Service</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-slate-800/60 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-xs text-slate-600">© 2024 QueryAI, Inc. All rights reserved.</p>
+                <div class="flex gap-4">
+                    <a href="#" class="text-slate-500 hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
+                    </a>
+                    <a href="#" class="text-slate-500 hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

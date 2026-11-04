@@ -1,134 +1,283 @@
-"use client"
-import { useState } from "react";
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Zap, Mail, ArrowRight } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { GoogleIcon, GitHubIcon } from "@/components/OAuthBrandIcons";
+import LandingGlow from "@/components/LandingGlow";
 
-interface AuthViewProps {
-  onLoginSuccess: () => void;
-}
+type Mode = "login" | "signup" | "forgot";
 
-export default function AuthView({ onLoginSuccess }: AuthViewProps) {
-  const [isLogin, setIsLogin] = useState(true);
+const inputClass =
+  "w-full border border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500";
+
+const labelClass = "text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block";
+
+type ProviderInfo = {
+  id: string;
+  callbackUrl?: string;
+};
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthSignin: "Could not start OAuth. Check GOOGLE_* / GITHUB_* in client/.env.",
+  OAuthCallback:
+    "OAuth was rejected or the callback URL is not registered with Google/GitHub. Add the exact callback URLs below to your OAuth app settings.",
+  OAuthCreateAccount: "Could not create your account after sign-in.",
+  Callback: "Sign-in failed during callback. Verify OAuth callback URLs match NEXTAUTH_URL.",
+  Configuration: "Auth is misconfigured. Set NEXTAUTH_URL and NEXTAUTH_SECRET in client/.env.",
+  google: "Google sign-in failed. Register the Google callback URL in Google Cloud Console.",
+  github: "GitHub sign-in failed. Check that the OAuth App callback URL matches NEXTAUTH_URL in client/.env.",
+};
+
+export default function AuthView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { status } = useSession();
+  const [mode, setMode] = useState<Mode>("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
+
+  const oauthError = searchParams.get("error");
+  const oauthHint = useMemo(() => {
+    if (!oauthError) return null;
+    return OAUTH_ERROR_MESSAGES[oauthError] || "Sign-in failed. Try again or use email.";
+  }, [oauthError]);
+
+  useEffect(() => {
+    if (status === "authenticated") router.replace("/app");
+  }, [status, router]);
+
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((r) => r.json())
+      .then((data) => setProviders(data))
+      .catch(() => setProviders({}));
+  }, []);
+
+  const googleCallback = providers.google?.callbackUrl;
+  const githubCallback = providers.github?.callbackUrl;
+  const showGoogle = Boolean(providers.google);
+  const showGitHub = Boolean(providers.github);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setBusy(true);
+    try {
+      if (mode === "forgot") {
+        const res = await fetch("/api/auth/forgot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not send email");
+        setInfo(data.message || "Check your inbox for a reset link.");
+        return;
+      }
+
+      if (mode === "signup") {
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not sign up");
+      }
+
+      const result = await signIn("credentials", {
+        email,
+        password,
+        callbackUrl: "/app",
+        redirect: false,
+      });
+      if (result?.error) throw new Error("Email or password is incorrect");
+      window.location.href = result?.url || "/app";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <div className="flex h-screen w-full bg-white font-sans overflow-hidden">
-      
-      {/* LEFT SIDE: Branding / Value Prop */}
-      <div className="hidden lg:flex w-1/2 bg-slate-900 p-12 flex-col justify-between relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-violet-900/40 z-0"></div>
-        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-indigo-500/20 blur-3xl"></div>
-        
-        <div className="relative z-10 flex items-center gap-2 mb-10">
-          <div className="bg-gradient-to-br from-indigo-500 to-violet-500 p-2 rounded-lg text-white">
-            <Zap size={24} />
+    <div className="relative flex min-h-screen w-full overflow-hidden bg-slate-950 font-sans text-slate-50">
+      <LandingGlow />
+      <div className="relative z-10 hidden w-1/2 flex-col justify-between p-12 lg:flex">
+        <div className="mb-10 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white">
+            <Zap size={18} />
           </div>
-          <span className="font-bold text-2xl text-white tracking-tight">SQL AI</span>
+          <span className="text-xl font-bold tracking-tight text-white">
+            SQL<span className="text-indigo-400">AI</span>
+          </span>
         </div>
-
-        <div className="relative z-10 mb-20">
-          <h1 className="text-5xl font-extrabold text-white tracking-tight mb-6 leading-tight">
-            Chat with your database in plain English.
+        <div className="mb-20">
+          <h1 className="mb-6 text-5xl font-extrabold leading-tight tracking-tight">
+            <span className="bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">
+              Chat with your database in
+            </span>
+            <br />
+            <span className="bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+              plain English.
+            </span>
           </h1>
-          <p className="text-slate-400 text-lg max-w-md">
-            Connect your PostgreSQL, MySQL, or Snowflake databases securely and generate complex SQL queries in seconds using AI.
+          <p className="max-w-md text-lg text-slate-400">
+            Connect PostgreSQL or MySQL and generate SQL in seconds.
           </p>
         </div>
-
-        <div className="relative z-10 text-slate-500 text-sm font-medium">
-          © 2026 SQL AI Inc. All rights reserved.
-        </div>
+        <div className="text-sm text-slate-500">© 2026 SQL AI</div>
       </div>
 
-      {/* RIGHT SIDE: Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 bg-slate-50 overflow-y-auto">
-        <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-          
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
-              {isLogin ? "Welcome back" : "Create an account"}
+      <div className="relative z-10 flex w-full items-center justify-center overflow-y-auto p-8 lg:w-1/2">
+        <div className="w-full max-w-md rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 p-px shadow-2xl shadow-indigo-900/20">
+          <div className="rounded-2xl border border-slate-800/60 bg-slate-950/80 p-8 backdrop-blur-lg">
+          <div className="mb-8 text-center">
+            <div className="mb-4 flex items-center justify-center gap-2 lg:hidden">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 text-white">
+                <Zap size={18} />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white">
+                SQL<span className="text-indigo-400">AI</span>
+              </span>
+            </div>
+            <h2 className="mb-2 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-3xl font-extrabold text-transparent">
+              {mode === "login" && "Welcome back"}
+              {mode === "signup" && "Create an account"}
+              {mode === "forgot" && "Reset password"}
             </h2>
-            <p className="text-slate-500">
-              {isLogin ? "Enter your credentials to access your workspace." : "Sign up to start chatting with your data."}
+            <p className="text-slate-400">
+              {mode === "forgot" ? "We will email you a one-time link." : "Use Google, GitHub, or email."}
             </p>
           </div>
 
-          {/* Social Auth Buttons */}
-          <div className="space-y-3 mb-8">
-            <button 
-            onClick={() => signIn("google", { callbackUrl: "/" })}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm"
-            >
-              {/* Google Brand SVG */}
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Continue with Google
-            </button>
-            <button className="w-full flex items-center justify-center gap-3 bg-[#24292F] text-white px-4 py-3 rounded-xl font-bold hover:bg-[#1b1f23] transition-all shadow-sm">
-  {/* GitHub Brand SVG */}
-  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-    <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.45-1.15-1.11-1.46-1.11-1.46-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
-  </svg>
-  Continue with GitHub
-</button>
-          </div>
+          {oauthHint && (
+            <div className="mb-6 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+              <p>{oauthHint}</p>
+              {(googleCallback || githubCallback) && (
+                <ul className="space-y-1 break-all font-mono text-xs text-amber-100">
+                  {googleCallback && <li>Google: {googleCallback}</li>}
+                  {githubCallback && <li>GitHub: {githubCallback}</li>}
+                </ul>
+              )}
+            </div>
+          )}
 
-          <div className="flex items-center gap-4 mb-8">
-            <div className="flex-1 border-t border-slate-200"></div>
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Or continue with email</span>
-            <div className="flex-1 border-t border-slate-200"></div>
-          </div>
+          {mode !== "forgot" && (showGoogle || showGitHub) && (
+            <div className="space-y-3 mb-8">
+              {showGoogle && (
+                <button
+                  type="button"
+                  onClick={() => signIn("google", { callbackUrl: "/app" })}
+                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-bold text-slate-100 hover:border-slate-600 hover:bg-slate-800"
+                >
+                  <GoogleIcon />
+                  Continue with Google
+                </button>
+              )}
+              {showGitHub && (
+                <button
+                  type="button"
+                  onClick={() => signIn("github", { callbackUrl: "/app" })}
+                  className="w-full flex items-center justify-center gap-3 bg-[#24292F] text-white px-4 py-3 rounded-xl font-bold hover:bg-[#1b1f23]"
+                >
+                  <GitHubIcon className="h-5 w-5 text-white" />
+                  Continue with GitHub
+                </button>
+              )}
+            </div>
+          )}
 
-          {/* Email / Password Form */}
-          <form 
-            onSubmit={(e) => { e.preventDefault(); onLoginSuccess(); }} 
-            className="space-y-4"
-          >
-            {!isLogin && (
+          <form onSubmit={submit} className="space-y-4">
+            {mode === "signup" && (
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Full Name</label>
-                <input type="text" placeholder="Jane Doe" required className="w-full border border-slate-300 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white" />
+                <label className={labelClass} htmlFor="auth-name">
+                  Full name
+                </label>
+                <input
+                  id="auth-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Jane Doe"
+                  className={inputClass}
+                />
               </div>
             )}
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Email Address</label>
+              <label className={labelClass} htmlFor="auth-email">
+                Email address
+              </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                  <Mail size={18} />
-                </div>
-                <input type="email" placeholder="you@company.com" required className="w-full border border-slate-300 pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white" />
+                <Mail size={18} className="absolute left-4 top-3.5 text-slate-500 pointer-events-none" />
+                <input
+                  id="auth-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  className={`${inputClass} pl-11`}
+                />
               </div>
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Password</label>
-              <input type="password" placeholder="••••••••" required className="w-full border border-slate-300 px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white" />
-            </div>
-
-            {isLogin && (
-              <div className="flex justify-end">
-                <button type="button" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">Forgot password?</button>
+            {mode !== "forgot" && (
+              <div>
+                <label className={labelClass} htmlFor="auth-password">
+                  Password
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className={inputClass}
+                />
               </div>
             )}
-
-            <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-3.5 rounded-xl font-bold hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-200 mt-2 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
-              {isLogin ? "Sign In" : "Create Account"} <ArrowRight size={18} />
+            {mode === "login" && (
+              <div className="flex justify-end">
+                <button type="button" onClick={() => setMode("forgot")} className="text-sm font-semibold text-indigo-300 hover:text-cyan-300">
+                  Forgot password?
+                </button>
+              </div>
+            )}
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            {info && <p className="text-sm text-emerald-400">{info}</p>}
+            <button
+              type="submit"
+              disabled={busy}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 font-bold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-500 disabled:opacity-60"
+            >
+              {busy ? "Working..." : mode === "login" ? "Sign In" : mode === "signup" ? "Create Account" : "Send reset link"}
+              <ArrowRight size={18} />
             </button>
           </form>
 
-          {/* Toggle Login / Signup */}
-          <div className="mt-8 text-center text-sm font-medium text-slate-600">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <button 
-              onClick={() => setIsLogin(!isLogin)} 
-              className="text-indigo-600 font-bold hover:text-indigo-700 transition-colors"
-            >
-              {isLogin ? "Sign up" : "Sign in"}
-            </button>
+          <div className="mt-8 text-center text-sm text-slate-400">
+            {mode === "login" && (
+              <button type="button" onClick={() => setMode("signup")} className="font-bold text-indigo-300 hover:text-cyan-300">
+                Don&apos;t have an account? Sign up
+              </button>
+            )}
+            {mode !== "login" && (
+              <button type="button" onClick={() => setMode("login")} className="font-bold text-indigo-300 hover:text-cyan-300">
+                Back to sign in
+              </button>
+            )}
           </div>
-
+          </div>
         </div>
       </div>
     </div>

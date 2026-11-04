@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { query } from '@/lib/db';
 import { callFlask } from '@/lib/flask';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/authOptions';
 
 /**
  * STEP 1: the user picked a database in the UI.

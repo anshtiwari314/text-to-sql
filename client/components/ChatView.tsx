@@ -2,7 +2,7 @@ import { Terminal, User, Zap, Play, Check, Sparkles, Copy } from "lucide-react";
 import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { addMessage, setActiveChatId } from "@/store/appSlice";
+import { addMessage, setActiveChatSessionId } from "@/store/appSlice";
 import { HISTORY_LIMIT } from "@/lib/flask";
 import { ChatMessage, QueryResult } from "@/types";
 import ResultTable from "@/components/ResultTable";
@@ -14,6 +14,7 @@ export default function ChatView() {
   // activeDbId is set when "Select & load schema" succeeds - it is the chat's database.
   const activeDbId = useSelector((state: RootState) => state.app.activeDbId);
   const selectedDbIds = useSelector((state: RootState) => state.app.selectedDbIds);
+  const activeChatSessionId = useSelector((state: RootState) => state.app.activeChatSessionId);
   const messages = useSelector((state: RootState) => state.app.messages);
 
   const [prompt, setPrompt] = useState("");
@@ -34,7 +35,7 @@ export default function ChatView() {
     // Which DB to query: explicit "load schema" pick, or the header query scope
     const databaseId = activeDbId ?? selectedDbIds[0] ?? null;
     if (!databaseId) {
-      alert("No database selected. Open 'Data Sources', add a connection, then select it in the header or click 'Select & load schema'.");
+      alert("No database selected. Open Data Sources, pick a database in the header, or load schemas first.");
       return;
     }
 
@@ -52,14 +53,19 @@ export default function ChatView() {
       const response = await fetch('/api/fullfill_query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: currentPrompt, databaseId, history }),
+        body: JSON.stringify({
+          prompt: currentPrompt,
+          databaseId,
+          history,
+          chatSessionId: activeChatSessionId,
+        }),
       });
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error || "Request failed");
 
-      const result = data as QueryResult & { chatId?: string };
-      if (result.chatId) dispatch(setActiveChatId(result.chatId));
+      const result = data as QueryResult & { chatSessionId?: string };
+      if (result.chatSessionId) dispatch(setActiveChatSessionId(result.chatSessionId));
       dispatch(
         addMessage({
           id: Date.now() + 1,
@@ -110,11 +116,13 @@ export default function ChatView() {
           <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 p-3 rounded-2xl mb-6 shadow-[0_0_30px_rgba(99,102,241,0.1)]">
             <Sparkles size={32} />
           </div>
-          <h2 className="text-4xl font-extrabold text-white tracking-tight mb-8 text-center">
+          <h2 className="mb-8 bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-center text-4xl font-extrabold tracking-tight text-transparent">
             What data do you need?
           </h2>
 
-          <div className="w-full relative shadow-2xl rounded-2xl group bg-slate-900/80 backdrop-blur-sm border border-slate-800 focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 transition-all">
+          <div className="group relative w-full rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 p-px shadow-2xl shadow-indigo-900/20">
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-500 opacity-20 blur transition duration-500 group-hover:opacity-40" />
+            <div className="relative rounded-2xl border border-slate-800 bg-slate-950/90 backdrop-blur-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/50">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -127,10 +135,11 @@ export default function ChatView() {
             <button
               onClick={handleGenerate}
               disabled={isLoading}
-              className="absolute right-3 bottom-3 h-[44px] bg-indigo-600 text-white px-6 rounded-xl hover:bg-indigo-500 flex items-center gap-2 font-bold shadow-lg shadow-indigo-900/20 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-60"
+              className="absolute bottom-3 right-3 flex h-[44px] items-center gap-2 rounded-xl bg-indigo-600 px-6 font-bold text-white shadow-lg shadow-indigo-500/25 transition-all hover:scale-105 hover:bg-indigo-500 active:scale-95 disabled:opacity-60"
             >
               <Terminal size={18} /> {isLoading ? "Working..." : "Generate"}
             </button>
+            </div>
           </div>
           <p className="text-slate-500 text-sm mt-4 font-medium">
             {activeDbId || selectedDbIds.length
@@ -154,7 +163,7 @@ export default function ChatView() {
           <div key={msg.id} className={`flex gap-4 max-w-4xl mx-auto ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
 
             <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
-              msg.role === "user" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30" : "bg-gradient-to-br from-indigo-500 to-violet-500 text-white"
+              msg.role === "user" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-gradient-to-br from-indigo-500 to-cyan-500 text-white"
             }`}>
               {msg.role === "user" ? <User size={20} /> : <Zap size={20} />}
             </div>
@@ -200,7 +209,7 @@ export default function ChatView() {
 
         {isLoading && (
           <div className="max-w-4xl mx-auto flex gap-4">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center shrink-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 text-white">
               <Zap size={20} />
             </div>
             <div className="px-5 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 text-sm font-medium animate-pulse">
@@ -213,7 +222,9 @@ export default function ChatView() {
 
       {/* Input bar fixed at the bottom */}
       <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-slate-950 via-slate-950 to-transparent pt-12">
-        <div className="max-w-4xl mx-auto w-full relative bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 shadow-2xl transition-all">
+        <div className="group relative mx-auto w-full max-w-4xl rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 p-px shadow-2xl shadow-indigo-900/20">
+          <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-500 opacity-20 blur transition duration-500 group-hover:opacity-40" />
+          <div className="relative rounded-2xl border border-slate-700 bg-slate-950/90 backdrop-blur-md focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/50">
           <textarea
             ref={textareaRef}
             rows={1}
@@ -226,10 +237,11 @@ export default function ChatView() {
           <button
             onClick={handleGenerate}
             disabled={isLoading}
-            className="absolute right-2 bottom-2 h-[42px] bg-indigo-600 text-white px-6 rounded-xl hover:bg-indigo-500 flex items-center gap-2 font-bold shadow-lg shadow-indigo-900/20 transition-all disabled:opacity-60"
+            className="absolute bottom-2 right-2 flex h-[42px] items-center gap-2 rounded-xl bg-indigo-600 px-6 font-bold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-500 disabled:opacity-60"
           >
             <Terminal size={18} /> {isLoading ? "Working..." : "Generate"}
           </button>
+          </div>
         </div>
       </div>
     </div>

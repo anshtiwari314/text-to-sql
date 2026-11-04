@@ -7,116 +7,140 @@ import {
   setActiveView,
   setConnectedDatabases,
   setActiveDbDetail,
-  setSchema,
+  setSchemaBundle,
+  setSchemasViewDbId,
   clearSchema,
+  setMessages,
+  setActiveChatSessionId,
+  setActiveDbId,
+  startNewChat,
 } from "@/store/appSlice";
+import { parseSchemaDdl } from "@/lib/parseSchemaDdl";
 
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import ChatView from "@/components/ChatView";
 import ChatHistory from "@/components/ChatHistory";
 import DatabaseList from "@/components/DatabaseList";
+import DatabaseSchemasView from "@/components/DatabaseSchemasView";
 import ConnectNewDatabase from "@/components/ConnectNewDatabase";
 import DatabaseDetails from "@/components/DatabaseDetails";
 import { DatabaseConnection } from "@/types";
+import LandingGlow from "@/components/LandingGlow";
 
 interface TextToSqlAppProps {
-  user?: { name?: string | null; email?: string | null; image?: string | null; };
+  user?: { name?: string | null; email?: string | null; image?: string | null };
 }
 
 export default function TextToSqlApp({ user }: TextToSqlAppProps) {
   const dispatch = useDispatch();
-
-  // Read state from Redux
   const activeView = useSelector((state: RootState) => state.app.activeView);
   const connectedDatabases = useSelector((state: RootState) => state.app.connectedDatabases);
   const activeDbDetail = useSelector((state: RootState) => state.app.activeDbDetail);
-  const activeDbId = useSelector((state: RootState) => state.app.activeDbId);
+  const schemaTables = useSelector((state: RootState) => state.app.schemaTables);
+  const schema = useSelector((state: RootState) => state.app.schema);
+  const schemasViewDbId = useSelector((state: RootState) => state.app.schemasViewDbId);
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
 
-  // Fetch databases from Postgres on component mount
   useEffect(() => {
-    const fetchDatabases = async () => {
-      try {
-        const response = await fetch('/api/databases');
-        if (response.ok) {
-          const data = await response.json();
-          dispatch(setConnectedDatabases(data.databases));
-        }
-      } catch (error) {
-        console.error("Failed to fetch databases", error);
-      }
-    };
-    fetchDatabases();
+    fetch("/api/databases")
+      .then((r) => r.json())
+      .then((data) => dispatch(setConnectedDatabases(data.databases)))
+      .catch((e) => console.error("Failed to fetch databases", e));
   }, [dispatch]);
 
-  // ---------------------------------------------------------------
-  // SELECT A DATABASE  ->  verify it + load its schema
-  //   1. Next.js /api/schema  -> Flask /api/schema
-  //   2. Flask connects to the user's DB, returns the schema text
-  //   3. We save that text in Redux; the chat sends it back later
-  // We stay on this page, so the database can still be reconfigured.
-  // ---------------------------------------------------------------
-  const handleSelectDatabase = async (db: DatabaseConnection) => {
+  const loadSchemaForDb = async (db: DatabaseConnection, goToSchemasView: boolean) => {
     setIsConnecting(true);
     setConnectError(null);
     dispatch(clearSchema());
+    dispatch(setSchemasViewDbId(db.id));
 
     try {
-      const response = await fetch('/api/schema', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/schema", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ databaseId: db.id }),
       });
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load schema");
 
-      if (!response.ok) throw new Error(data.error || "Could not connect to this database");
-
-      // This database is now the one the chat talks to
-      dispatch(setSchema({ dbId: db.id.toString(), schema: data.schema }));
+      const tables = parseSchemaDdl(data.schema);
+      dispatch(
+        setSchemaBundle({
+          dbId: db.id.toString(),
+          schema: data.schema,
+          tables,
+        })
+      );
+      if (goToSchemasView) dispatch(setActiveView("db_schemas"));
     } catch (error) {
-      setConnectError(error instanceof Error ? error.message : "Could not connect to this database");
+      setConnectError(error instanceof Error ? error.message : "Could not load schema");
     } finally {
       setIsConnecting(false);
     }
   };
 
-  // "Configure" opens the details page; it does not load a schema or start a chat
-  const handleConfigureDatabase = (db: DatabaseConnection) => {
+  const handleOpenConfiguration = (db: DatabaseConnection) => {
     dispatch(setActiveDbDetail(db));
     dispatch(setActiveView("db_details"));
   };
 
-  return (
-    <div className="flex h-screen w-full bg-slate-950 font-sans overflow-hidden text-slate-200">
-      <Sidebar activeView={activeView} setActiveView={(view) => dispatch(setActiveView(view))} />
+  const handleSelectChat = async (chatId: string) => {
+    try {
+      const response = await fetch(`/api/chats/${chatId}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to load chat");
 
-      <main className="flex-1 flex flex-col min-w-0 bg-gradient-to-br from-slate-950 via-[#0B0F19] to-slate-900 overflow-y-auto">
+      dispatch(setActiveChatSessionId(data.chat.id));
+      dispatch(setActiveDbId(data.chat.database_id));
+      dispatch(setMessages(data.messages));
+      dispatch(setActiveView("chat"));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-slate-950 font-sans text-slate-50">
+      <Sidebar
+        activeView={activeView}
+        setActiveView={(view) => {
+          if (view === "chat") dispatch(startNewChat());
+          else dispatch(setActiveView(view));
+        }}
+      />
+
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-slate-950">
+        <LandingGlow />
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
         <Header user={user} />
 
-        <div className="flex-1 overflow-y-auto relative">
-
+        <div className="relative flex-1 overflow-y-auto">
           {activeView === "chat" && <ChatView />}
 
-          {activeView === "chat_history" && (
-            <ChatHistory
-              onSelectChat={() => {
-                dispatch(setActiveView("chat"));
-              }}
-            />
-          )}
+          {activeView === "chat_history" && <ChatHistory onSelectChat={handleSelectChat} />}
 
           {activeView === "db_list" && (
             <DatabaseList
               databases={connectedDatabases}
               onAddNew={() => dispatch(setActiveView("new_db"))}
-              onSelectDb={handleSelectDatabase}
-              onConfigureDb={handleConfigureDatabase}
+              onOpenConfiguration={handleOpenConfiguration}
               isConnecting={isConnecting}
               connectError={connectError}
-              activeDbId={activeDbId}
+            />
+          )}
+
+          {activeView === "db_schemas" && (
+            <DatabaseSchemasView
+              databases={connectedDatabases}
+              focusDbId={schemasViewDbId}
+              schemaTables={schemaTables}
+              schemaRaw={schema}
+              isLoading={isConnecting}
+              error={connectError}
+              onSelectDatabaseCard={(db) => void loadSchemaForDb(db, false)}
             />
           )}
 
@@ -124,11 +148,9 @@ export default function TextToSqlApp({ user }: TextToSqlAppProps) {
             <ConnectNewDatabase
               onBack={() => dispatch(setActiveView("db_list"))}
               onSuccess={() => {
-                // Re-fetch so the new database appears in the list
-                fetch('/api/databases')
-                  .then((response) => response.json())
-                  .then((data) => dispatch(setConnectedDatabases(data.databases)))
-                  .catch((error) => console.error("Failed to refresh databases", error));
+                fetch("/api/databases")
+                  .then((r) => r.json())
+                  .then((data) => dispatch(setConnectedDatabases(data.databases)));
                 dispatch(setActiveView("db_list"));
               }}
             />
@@ -138,17 +160,15 @@ export default function TextToSqlApp({ user }: TextToSqlAppProps) {
             <DatabaseDetails
               db={activeDbDetail}
               onBack={() => dispatch(setActiveView("db_list"))}
-              activeDbId={activeDbId}
+              activeDbId={schemasViewDbId}
               onSaved={() => {
-                // Re-fetch so name/engine changes show up in the list
-                fetch('/api/databases')
-                  .then((response) => response.json())
-                  .then((data) => dispatch(setConnectedDatabases(data.databases)))
-                  .catch((error) => console.error("Failed to refresh databases", error));
+                fetch("/api/databases")
+                  .then((r) => r.json())
+                  .then((data) => dispatch(setConnectedDatabases(data.databases)));
               }}
             />
           )}
-
+        </div>
         </div>
       </main>
     </div>

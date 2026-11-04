@@ -1,0 +1,6 @@
+
+2026-11-04 — Client: chat persistence + schema browser UI
+- chat_sessions / chat_messages tables (ensureChatTables on API use).
+- /api/chats, /api/chats/[id]; fullfill_query saves user+ai messages per session.
+- Database card dropdown: Configuration | Schemas; DatabaseSchemasView + sidebar Schemas link.
+- Removed mock ChatHistory data.
