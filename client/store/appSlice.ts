@@ -1,12 +1,18 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ViewState, DatabaseConnection } from '@/types';
+import { ViewState, DatabaseConnection, ChatMessage } from '@/types';
 
 interface AppState {
   activeView: ViewState;
   connectedDatabases: DatabaseConnection[];
   selectedDbIds: string[]; // Stores the IDs of the databases checked in the Header
-  activeChatId: string | null; // Tracks the active 
+  activeChatId: string | null; // Tracks the active chat
   activeDbDetail: DatabaseConnection | null;
+
+  // --- text-to-SQL flow ---
+  activeDbId: string | null;    // the database the chat talks to (null = nothing connected)
+  schema: string | null;        // schema text verified + cached from Flask (/api/schema)
+  schemaDbId: string | null;    // which database that schema belongs to
+  messages: ChatMessage[];      // the current chat (also sent to Flask as "history")
 }
 
 const initialState: AppState = {
@@ -15,6 +21,11 @@ const initialState: AppState = {
   selectedDbIds: [],
   activeChatId: null,
   activeDbDetail: null,
+
+  activeDbId: null,
+  schema: null,
+  schemaDbId: null,
+  messages: [],
 };
 
 const appSlice = createSlice({
@@ -35,6 +46,12 @@ const appSlice = createSlice({
       const id = action.payload;
       if (state.selectedDbIds.includes(id)) {
         state.selectedDbIds = state.selectedDbIds.filter(dbId => dbId !== id);
+        // Deselecting the DB the chat was tied to — drop cached schema only then
+        if (state.activeDbId === id) {
+          state.activeDbId = null;
+          state.schema = null;
+          state.schemaDbId = null;
+        }
       } else {
         state.selectedDbIds.push(id);
       }
@@ -45,9 +62,36 @@ const appSlice = createSlice({
 
     setActiveDbDetail: (state, action: PayloadAction<DatabaseConnection | null>) => {
       state.activeDbDetail = action.payload;
-    }
+    },
+
+    // Store the schema we got back from Flask after connecting.
+    // This also makes that database the active one for the chat.
+    setSchema: (state, action: PayloadAction<{ dbId: string; schema: string }>) => {
+      state.activeDbId = action.payload.dbId;
+      state.schema = action.payload.schema;
+      state.schemaDbId = action.payload.dbId;
+    },
+    // Keep the active database, throw away the schema (forces a reload)
+    clearSchema: (state) => {
+      state.schema = null;
+      state.schemaDbId = null;
+    },
+
+    // Add a chat message (user question, AI answer, or clarification question)
+    addMessage: (state, action: PayloadAction<ChatMessage>) => {
+      state.messages.push(action.payload);
+    },
   },
 });
 
-export const { setActiveView, setConnectedDatabases, toggleSelectedDb, setActiveChatId,setActiveDbDetail } = appSlice.actions;
+export const {
+  setActiveView,
+  setConnectedDatabases,
+  toggleSelectedDb,
+  setActiveChatId,
+  setActiveDbDetail,
+  setSchema,
+  clearSchema,
+  addMessage,
+} = appSlice.actions;
 export default appSlice.reducer;

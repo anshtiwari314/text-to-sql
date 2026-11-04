@@ -1,0 +1,4 @@
+2026-11-04 — OPENROUTER_API_KEY fix
+- Root cause: server/.env had OPENROUTER_API_KEY wrapped as ""value""; dotenv skipped line 4, key length 0 at runtime.
+- Fixed user .env (strip extra quotes), config.py loads server/.env via Path, clearer RuntimeError + warning log.
+- Updated .env.example comment; memplace + test_cases.md appended.

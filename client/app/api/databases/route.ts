@@ -12,6 +12,7 @@ export async function GET(req: Request) {
 
   try {
     const result = await query(
+      // The real column is conn_name (the Prisma schema calls it "name").
       `SELECT 
         id, 
         conn_name AS name, 
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
 
     const databases = result.rows.map(row => ({
       ...row,
-      readOnly: row.read_only || false 
+      readOnly: row.read_only || false
     }));
 
     return NextResponse.json({ databases }, { status: 200 });
@@ -48,6 +49,7 @@ export async function POST(req: Request) {
 
   try {
     const data = await req.json();
+    // The form sends conn_name - the same name the table uses.
     const { conn_name, engine, host, port, db_username, db_password, db_name } = data;
 
     // 2. Save to database using the pg pool

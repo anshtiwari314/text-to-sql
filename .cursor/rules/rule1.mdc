@@ -1,0 +1,29 @@
+---
+description: Global project rules governing context retention, dynamic session logging, test case archival, and simple modular code architecture.
+globs: **/*
+alwaysApply: true
+---
+
+# Core Project Guidelines & Constraints
+
+## 1. Context Retention (Memplace)
+- **Definition:** "Memplace" is the global project memory file located at `docs/memplace.md`.
+- **Action:** You are required to read, refer to, and update `docs/memplace.md` automatically as needed without asking for user permission first. Always maintain ongoing thread and project continuity within this file.
+
+## 2. Test Cases Tracking
+- **Storage:** Whenever the user provides or describes a test case, automatically document and append it to the test log file located at `tests/test_cases.md`.
+- *Constraint: Do not store test documentation or code inside `.venv`.*
+
+## 3. Dynamic Session Logging (for server)
+- **Requirement:** Every time you add, modify, or refactor code, you must include explicit, trackable log statements within the source code.
+- **Session Audit Trail:** For every code modification, you must also append a change summary log to the specific active session file matching the path pattern: `server/data/sessions/<session_id>/*.log`.
+- **Action:** Track the active `session_id` from the runtime environment or current task context and ensure the corresponding `.log` file is updated immediately whenever code changes occur.
+
+## 4. Simple & Low-Token Code
+- **Style:** Write code as simply as humanly possible.
+- **Efficiency:** Drastically minimize token count and completely avoid over-engineering. 
+- **Readability:** Structure the logic so that any junior developer ("noob") can read and understand it instantly.
+
+## 5. Modular Code Division
+- **Architecture:** Break down systems into multiple, highly specialized small files instead of building monolithic blocks.
+- **Naming Convention:** Use crystal-clear, self-documenting file names. A developer looking exclusively at the file name must immediately comprehend the file's exact functional role in the codebase.

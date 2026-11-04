@@ -1,0 +1,27 @@
+2026-11-04 — W3Schools schema / LLM clarification fix
+- Symptom: LLM asked which table/column holds country — schema text was empty or missing columns on MySQL.
+- Added server/services/mysql_schema.py (information_schema by saved db_name).
+- db_service.fetch_schema routes MySQL through mysql_schema; PG uses explicit schema in inspector.
+- chat_service + mysql_schema logging; llm_service prompt: do not clarify when column exists.
+- Tests: server/tests/test_w3schools_schema.py; memplace file graph expanded.
+
+2026-11-04 follow-up — user still saw country clarification
+- mysql_schema: DATABASE(), case-insensitive schema, SHOW TABLES fallback.
+- Schema text now in LLM user message; server-side override runs DISTINCT Country SQL when schema has Country column.
+
+2026-11-04 — User on PostgreSQL (not MySQL)
+- Bug: fetch_schema used db_name as PostgreSQL schema name → empty tables on PG.
+- Added postgres_schema.py (information_schema, public first); shared schema_format.py.
+
+2026-11-04 — Align Flask with Ai-course/3-text-to-sql/agent.py (user: works locally, app did not)
+- Old app tests: SQLite + fake LLM only; not remote MySQL w3schools.
+- agent.py: mysql+pymysql, MetaData.reflect, CREATE TABLE DDL, JSON sql, OpenRouter headers, PascalCase tables.
+- App now: schema_reflect_ddl.py, llm JSON parse, w3schools_sql casing, chat_service same pipeline.
+
+2026-11-04 — JSON parse error on shippers question
+- System prompt copied from agent.py (dialect + real CREATE TABLE schema).
+- Parser accepts fenced JSON, extra text around JSON, and a bare SELECT.
+
+2026-11-04 — Client showed the JSON error, not a table
+- Saved connection database name was `mysql` (system DB), not `w3schools`.
+- Updated that saved row to `w3schools`. Live query returned United Package 74, Federal Shipping 68, Speedy Express 54.
