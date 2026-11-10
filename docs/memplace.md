@@ -46,7 +46,10 @@ Landing **Sign in** / **Get Started** links → `/auth`. After OAuth or email lo
 - **Reset**: `POST /api/auth/reset` with token + new password.
 - **`/auth` page**: client `useSession` redirect to `/app` when logged in (no server `getServerSession` — avoids Next 16 `cacheComponents` conflict).
 - **SessionProvider** in `StoreProvider` for client `signIn()`.
-- OAuth redirect URIs: `{NEXTAUTH_URL}/api/auth/callback/google` and `…/github` (must match GitHub **OAuth App**, not GitHub App).
+- OAuth redirect URIs: `{NEXTAUTH_URL}/api/auth/callback/google` and `…/github` (must match GitHub **OAuth App**, not GitHub App). **`NEXTAUTH_URL`** = exact public URL (`https://your.domain`, no trailing `/`).
+- **`AccessDenied`** on OAuth: `signIn` callback returned false — usually **Postgres unreachable** from the client container, or **no email** from GitHub (private email). Check `docker compose logs client` for `[auth] OAuth signIn DB error`.
+- **Signup/OAuth 500**: almost always **client cannot reach Postgres**. On Docker, `DATABASE_URL` in compose must match the `postgres` service (`postgres`/`password`/`text-to-sql` by default, host `postgres:5432`). Do not point `DATABASE_URL` at a LAN IP from inside the client container. Logs: `[auth] signup error:`.
+- Cloudflare Tunnel: register the same callback URLs in Google/GitHub; set `CORS_ORIGINS` in `server/.env` to the public site URL.
 
 **Client env** (see `client/.env.example`): `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_*`, `GITHUB_*`, `DATABASE_URL`, `FLASK_URL`, `SMTP_*` (`SMTP_FROM` = visible From address; defaults to `SMTP_USER`), **`ADMIN_EMAIL_ID`**.
 

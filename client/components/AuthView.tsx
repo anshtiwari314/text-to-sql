@@ -26,6 +26,8 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthCallback:
     "OAuth was rejected or the callback URL is not registered with Google/GitHub. Add the exact callback URLs below to your OAuth app settings.",
   OAuthCreateAccount: "Could not create your account after sign-in.",
+  AccessDenied:
+    "Sign-in was blocked (no email from the provider, or the app database rejected the login). Check Docker logs for [auth] OAuth signIn DB error.",
   Callback: "Sign-in failed during callback. Verify OAuth callback URLs match NEXTAUTH_URL.",
   Configuration: "Auth is misconfigured. Set NEXTAUTH_URL and NEXTAUTH_SECRET in client/.env.",
   google: "Google sign-in failed. Register the Google callback URL in Google Cloud Console.",

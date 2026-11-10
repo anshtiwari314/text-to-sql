@@ -71,25 +71,36 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth",
   },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (account?.provider === "credentials") return true;
-      if (!user.email) return false;
+
+      const profileEmail =
+        profile && typeof profile === "object" && "email" in profile
+          ? String((profile as { email?: string | null }).email || "").trim()
+          : "";
+      const email = (user.email || profileEmail).trim();
+      if (!email) {
+        console.error("[auth] OAuth denied: no email from", account?.provider);
+        return false;
+      }
 
       try {
         await ensureAuthTables();
-        const existingUser = await query("SELECT id FROM users WHERE email = $1", [user.email]);
+        const existingUser = await query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [email]);
 
         if (existingUser.rows.length > 0) {
-          await query("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE email = $1", [user.email]);
+          await query("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE LOWER(email) = LOWER($1)", [
+            email,
+          ]);
         } else {
           await query(
             "INSERT INTO users (name, email, image, welcome_mailed) VALUES ($1, $2, $3, false)",
-            [user.name, user.email, user.image]
+            [user.name || email, email, user.image]
           );
         }
         return true;
       } catch (error) {
-        console.error("[auth] OAuth signIn DB error:", error);
+        console.error("[auth] OAuth signIn DB error:", account?.provider, error);
         return false;
       }
     },

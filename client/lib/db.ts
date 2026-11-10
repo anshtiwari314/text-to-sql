@@ -1,9 +1,18 @@
 import { Pool } from 'pg';
 
-// Creates a single connection pool to your primary application database
+/** Prisma adds ?schema=public; node-pg should not receive that query string. */
+function pgUrl(): string | undefined {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return undefined;
+  const noQuery = raw.split('?')[0];
+  if (noQuery === raw) return raw;
+  console.log('[db] DATABASE_URL: stripped Prisma query params for pg driver');
+  return noQuery;
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // e.g., postgres://user:pass@host:5432/sql_app
-  max: 10, // Max number of connections
+  connectionString: pgUrl(),
+  max: 10,
 });
 
 export const query = (text: string, params?: any[]) => pool.query(text, params);

@@ -23,7 +23,8 @@ export async function POST(req: Request) {
     );
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('signup:', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[auth] signup error:', msg);
     return NextResponse.json({ error: 'Could not create account' }, { status: 500 });
   }
 }

@@ -3,6 +3,17 @@ import { query } from '@/lib/db';
 let ready = false;
 
 export async function ensureAuthTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(255),
+      email VARCHAR(255) NOT NULL,
+      image TEXT,
+      last_login TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_key ON users (email)`);
+
   // Always apply column alters (safe with IF NOT EXISTS).
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS welcome_mailed BOOLEAN`);
