@@ -1,7 +1,0 @@
-2026-11-04 landing theme on /auth and /app
-- Added client/components/LandingGlow.tsx (indigo-600, cyan-600, blue-600 blobs).
-- AuthView: dark slate-950 card, indigo→cyan logo, gradient headline, indigo-600 CTA shadow.
-- TextToSqlApp, Sidebar, Header, ChatView: same glow, logo, and composer border.
-- ResetPasswordForm uses the same backdrop.
-- globals.css background set to #020617.
-- docs/memplace.md: Theme section, dark-input pitfall, LandingGlow in key files.

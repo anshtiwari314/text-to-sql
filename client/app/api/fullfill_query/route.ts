@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { ensureChatTables } from '@/lib/ensureChatTables';
 import { callFlask } from '@/lib/flask';
 import { getRequestUser } from '@/lib/getRequestUser';
+import { assertCanQuery } from '@/lib/queryQuota';
 
 export async function POST(req: Request) {
   const user = await getRequestUser(req);
@@ -16,6 +17,11 @@ export async function POST(req: Request) {
 
     if (!prompt?.trim() || !databaseId) {
       return NextResponse.json({ error: 'prompt and databaseId are required' }, { status: 400 });
+    }
+
+    const quota = await assertCanQuery(user);
+    if (!quota.ok) {
+      return NextResponse.json({ error: quota.error }, { status: 403 });
     }
 
     const dbResult = await query(

@@ -62,7 +62,10 @@ export default function ChatView() {
       });
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error || "Request failed");
+      if (!response.ok) {
+        window.dispatchEvent(new Event("query-quota-refresh"));
+        throw new Error(data.error || "Request failed");
+      }
 
       const result = data as QueryResult & { chatSessionId?: string };
       if (result.chatSessionId) dispatch(setActiveChatSessionId(result.chatSessionId));
@@ -76,6 +79,7 @@ export default function ChatView() {
           rows: result.rows ?? [],
         })
       );
+      window.dispatchEvent(new Event("query-quota-refresh"));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong";
       dispatch(addMessage({ id: Date.now() + 1, role: "ai", content: `Error: ${message}` }));

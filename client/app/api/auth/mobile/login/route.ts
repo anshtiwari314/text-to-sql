@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { query } from "@/lib/db";
 import { ensureAuthTables } from "@/lib/ensureAuthTables";
 import { signMobileToken } from "@/lib/mobileToken";
+import { notifyAdminLogin } from "@/lib/notifyLogin";
 
 /** Email login for the phone app. Returns a bearer token (no browser cookie). */
 export async function POST(req: Request) {
@@ -31,6 +32,11 @@ export async function POST(req: Request) {
 
     const user = { id: row.id, name: row.name, email: row.email, image: row.image };
     const token = signMobileToken(user);
+    await notifyAdminLogin(
+      { email: user.email, name: user.name },
+      "mobile-email",
+      { localTime: body.localTime, timezone: body.timezone, location: body.location }
+    );
     return NextResponse.json({ token, user });
   } catch (error) {
     console.error("[mobile-auth] login failed", error);

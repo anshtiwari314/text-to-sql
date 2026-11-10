@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { requestLoginLocation, stampLoginClient } from "@/lib/requestLoginLocation";
 
 function MobileOAuthStart() {
   const params = useSearchParams();
@@ -10,6 +11,8 @@ function MobileOAuthStart() {
   const ret = params.get("return") || "";
 
   useEffect(() => {
+    requestLoginLocation();
+    stampLoginClient();
     const callbackUrl = `${window.location.origin}/api/auth/mobile/handoff?return=${encodeURIComponent(ret)}`;
     console.log("[mobile-oauth] start", provider, callbackUrl);
     void signIn(provider, { callbackUrl });

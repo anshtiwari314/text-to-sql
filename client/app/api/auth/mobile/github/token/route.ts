@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { githubOAuthCreds } from "@/lib/oauthEnv";
 import { signMobileToken } from "@/lib/mobileToken";
 import { upsertOAuthUser } from "@/lib/upsertOAuthUser";
+import { notifyAdminLogin } from "@/lib/notifyLogin";
 
 /**
  * Token endpoint for react-native-app-auth.
@@ -15,9 +16,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "GitHub sign-in is not configured on the server" }, { status: 500 });
     }
 
+    const url = new URL(req.url);
     const params = new URLSearchParams(await req.text());
     const code = params.get("code");
     const redirectUri = params.get("redirect_uri");
+    const localTime = params.get("local_time") || url.searchParams.get("local_time");
+    const timezone = params.get("timezone") || url.searchParams.get("timezone");
+    const location = params.get("location") || url.searchParams.get("location");
     if (!code) {
       return NextResponse.json({ error: "code is required" }, { status: 400 });
     }
@@ -70,6 +75,11 @@ export async function POST(req: Request) {
     });
     const token = signMobileToken(user);
     console.log("[mobile-auth] github session issued", user.email);
+    await notifyAdminLogin(
+      { email: user.email, name: user.name },
+      "mobile-github",
+      { localTime, timezone, location }
+    );
     return NextResponse.json({
       access_token: token,
       token_type: "bearer",

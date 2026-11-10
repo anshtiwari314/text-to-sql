@@ -1,5 +1,0 @@
-2026-11-04 — Sidebar, landing, email auth
-- Database sidebar items: Configuration and Schemas (removed from cards).
-- Landing iframe from public/landing.html; Sign in goes to /login.
-- Google + GitHub + email signup; forgot password emails a /reset-password?token= link via nodemailer.
-- client/.env.example lists GITHUB_* and SMTP_*.

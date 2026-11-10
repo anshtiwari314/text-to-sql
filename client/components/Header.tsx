@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { LogOut, User, Database, ChevronDown, Check } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { LogOut, User, Database, ChevronDown, Check, Zap } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { toggleSelectedDb } from "@/store/appSlice";
+
+type QuotaState = {
+  used: number;
+  limit: number;
+  remaining: number | null;
+  isAdmin: boolean;
+};
 
 interface HeaderProps {
   user?: { name?: string | null; email?: string | null; image?: string | null; };
@@ -16,6 +23,23 @@ export default function Header({ user }: HeaderProps) {
   const databases = useSelector((state: RootState) => state.app.connectedDatabases);
   const selectedDbs = useSelector((state: RootState) => state.app.selectedDbIds);
   const [isDbDropdownOpen, setIsDbDropdownOpen] = useState(false);
+  const [quota, setQuota] = useState<QuotaState | null>(null);
+
+  const loadQuota = useCallback(() => {
+    fetch("/api/query-quota")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data.limit === "number") setQuota(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadQuota();
+    const onRefresh = () => loadQuota();
+    window.addEventListener("query-quota-refresh", onRefresh);
+    return () => window.removeEventListener("query-quota-refresh", onRefresh);
+  }, [loadQuota]);
 
   return (
     <header className="relative z-30 flex h-16 w-full shrink-0 items-center justify-between border-b border-slate-800/60 bg-slate-950/70 px-8 shadow-sm backdrop-blur-lg">
@@ -55,9 +79,18 @@ export default function Header({ user }: HeaderProps) {
         )}
       </div>
 
-      {/* Right User Info Block (Keep identical to previous) */}
-      {/* RIGHT: User Info & Logout */}
       <div className="flex items-center gap-4">
+      {quota && !quota.isAdmin && quota.remaining !== null && (
+        <div
+          className="flex items-center gap-2 rounded-lg border border-indigo-500/25 bg-indigo-500/10 px-3 py-1.5 text-sm font-semibold text-indigo-300"
+          title={`${quota.used} of ${quota.limit} queries used`}
+        >
+          <Zap size={14} className="text-cyan-400" />
+          <span>
+            {quota.remaining} query{quota.remaining !== 1 ? "ies" : ""} left
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <div className="hidden md:flex flex-col items-end text-sm">
           <span className="font-bold text-slate-200">{user?.name || "User"}</span>

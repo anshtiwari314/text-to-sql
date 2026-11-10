@@ -7,6 +7,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { GoogleIcon, GitHubIcon } from "@/components/OAuthBrandIcons";
 import LandingGlow from "@/components/LandingGlow";
+import { requestLoginLocation, stampLoginClient } from "@/lib/requestLoginLocation";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -49,6 +50,10 @@ export default function AuthView() {
     if (!oauthError) return null;
     return OAUTH_ERROR_MESSAGES[oauthError] || "Sign-in failed. Try again or use email.";
   }, [oauthError]);
+
+  useEffect(() => {
+    requestLoginLocation();
+  }, []);
 
   useEffect(() => {
     if (status === "authenticated") router.replace("/app");
@@ -94,6 +99,7 @@ export default function AuthView() {
         if (!res.ok) throw new Error(data.error || "Could not sign up");
       }
 
+      stampLoginClient();
       const result = await signIn("credentials", {
         email,
         password,
@@ -118,7 +124,7 @@ export default function AuthView() {
             <Zap size={18} />
           </div>
           <span className="text-xl font-bold tracking-tight text-white">
-            SQL<span className="text-indigo-400">AI</span>
+            Query<span className="text-indigo-400">AI</span>
           </span>
         </div>
         <div className="mb-20">
@@ -135,7 +141,7 @@ export default function AuthView() {
             Connect PostgreSQL or MySQL and generate SQL in seconds.
           </p>
         </div>
-        <div className="text-sm text-slate-500">© 2026 SQL AI</div>
+        <div className="text-sm text-slate-500">© 2026 QueryAI</div>
       </div>
 
       <div className="relative z-10 flex w-full items-center justify-center overflow-y-auto p-8 lg:w-1/2">
@@ -147,7 +153,7 @@ export default function AuthView() {
                 <Zap size={18} />
               </div>
               <span className="text-xl font-bold tracking-tight text-white">
-                SQL<span className="text-indigo-400">AI</span>
+                Query<span className="text-indigo-400">AI</span>
               </span>
             </div>
             <h2 className="mb-2 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-3xl font-extrabold text-transparent">
@@ -177,7 +183,10 @@ export default function AuthView() {
               {showGoogle && (
                 <button
                   type="button"
-                  onClick={() => signIn("google", { callbackUrl: "/app" })}
+                  onClick={() => {
+                    stampLoginClient();
+                    void signIn("google", { callbackUrl: "/app" });
+                  }}
                   className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-bold text-slate-100 hover:border-slate-600 hover:bg-slate-800"
                 >
                   <GoogleIcon />
@@ -187,7 +196,10 @@ export default function AuthView() {
               {showGitHub && (
                 <button
                   type="button"
-                  onClick={() => signIn("github", { callbackUrl: "/app" })}
+                  onClick={() => {
+                    stampLoginClient();
+                    void signIn("github", { callbackUrl: "/app" });
+                  }}
                   className="w-full flex items-center justify-center gap-3 bg-[#24292F] text-white px-4 py-3 rounded-xl font-bold hover:bg-[#1b1f23]"
                 >
                   <GitHubIcon className="h-5 w-5 text-white" />

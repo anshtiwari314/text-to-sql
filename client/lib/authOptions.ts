@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { query } from "@/lib/db";
 import { ensureAuthTables } from "@/lib/ensureAuthTables";
 import { authBaseUrl, githubOAuthCreds, googleOAuthCreds, oauthCallbackUrls } from "@/lib/oauthEnv";
+import { notifyAdminLogin } from "@/lib/notifyLogin";
 
 function buildProviders(): NextAuthOptions["providers"] {
   const list: NextAuthOptions["providers"] = [];
@@ -82,11 +83,10 @@ export const authOptions: NextAuthOptions = {
         if (existingUser.rows.length > 0) {
           await query("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE email = $1", [user.email]);
         } else {
-          await query("INSERT INTO users (name, email, image) VALUES ($1, $2, $3)", [
-            user.name,
-            user.email,
-            user.image,
-          ]);
+          await query(
+            "INSERT INTO users (name, email, image, welcome_mailed) VALUES ($1, $2, $3, false)",
+            [user.name, user.email, user.image]
+          );
         }
         return true;
       } catch (error) {
@@ -107,6 +107,15 @@ export const authOptions: NextAuthOptions = {
         }
       }
       return session;
+    },
+  },
+  events: {
+    async signIn({ user, account }) {
+      console.log("[auth] signIn event", user.email, account?.provider);
+      await notifyAdminLogin(
+        { email: user.email, name: user.name },
+        account?.provider || "unknown"
+      );
     },
   },
 };

@@ -1,5 +1,0 @@
-2026-11-10 — Add Docker packaging
-- server/Dockerfile (gunicorn :8000), client/Dockerfile (Next standalone), root docker-compose.yml with Postgres 16
-- client/next.config.ts: output standalone; compose.env.example; .dockerignore for client/server
-- docs/memplace.md: Docker section
-2026-11-10 — Root .gitignore unified for client/server/mobileApp; removed mobileApp/.gitignore

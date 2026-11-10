@@ -21,7 +21,7 @@ export default function Sidebar({ activeView, setActiveView }: SidebarProps) {
           <Zap size={18} />
         </div>
         <span className="text-xl font-bold tracking-tight text-white">
-          SQL<span className="text-indigo-400">AI</span>
+          Query<span className="text-indigo-400">AI</span>
         </span>
       </div>
       

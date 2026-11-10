@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { googleOAuthCreds } from "@/lib/oauthEnv";
 import { signMobileToken } from "@/lib/mobileToken";
 import { upsertOAuthUser } from "@/lib/upsertOAuthUser";
+import { notifyAdminLogin } from "@/lib/notifyLogin";
 
 /**
  * Phone app sends the Google idToken from the native sign-in sheet.
@@ -9,7 +10,7 @@ import { upsertOAuthUser } from "@/lib/upsertOAuthUser";
  */
 export async function POST(req: Request) {
   try {
-    const { idToken } = await req.json();
+    const { idToken, localTime, timezone, location } = await req.json();
     if (!idToken || typeof idToken !== "string") {
       return NextResponse.json({ error: "idToken is required" }, { status: 400 });
     }
@@ -42,6 +43,11 @@ export async function POST(req: Request) {
     });
     const token = signMobileToken(user);
     console.log("[mobile-auth] google session issued", user.email);
+    await notifyAdminLogin(
+      { email: user.email, name: user.name },
+      "mobile-google",
+      { localTime, timezone, location }
+    );
     return NextResponse.json({ token, user });
   } catch (error) {
     console.error("[mobile-auth] google route failed", error);

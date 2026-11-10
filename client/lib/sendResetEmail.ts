@@ -1,28 +1,16 @@
-import nodemailer from 'nodemailer';
+import { createMailer, mailFrom } from "@/lib/smtp";
 
 export async function sendResetEmail(to: string, link: string, appLink?: string) {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) {
-    throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in client/.env');
+  const mailer = createMailer();
+  if (!mailer) {
+    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in client/.env");
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user, pass },
-  });
-
-  // Gmail SMTP: From should match SMTP_USER unless that address is a verified alias.
-  const from = process.env.SMTP_FROM?.includes('@') ? process.env.SMTP_FROM : `"SQL AI" <${user}>`;
-
-  console.log('[sendResetEmail] to=', to);
-  await transporter.sendMail({
-    from,
+  console.log("[sendResetEmail] to=", to);
+  await mailer.sendMail({
+    from: mailFrom(),
     to,
-    subject: 'Reset your SQL AI password',
+    subject: "Reset your QueryAI password",
     text: `Open this link to set a new password (valid for 1 hour):\n\n${link}\n${appLink ? `\nOn the phone app:\n${appLink}\n` : ""}`,
     html: `<p>Open this link to set a new password (valid for 1 hour):</p><p><a href="${link}">${link}</a></p>${appLink ? `<p>Phone app: <a href="${appLink}">${appLink}</a></p>` : ""}`,
   });
