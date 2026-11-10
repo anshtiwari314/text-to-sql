@@ -1,13 +1,13 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sqlapp}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sqlapp}
       POSTGRES_DB: ${POSTGRES_DB:-sql_app}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - /home/pi/Desktop/projects/text-to-sql/volume:/var/lib/postgresql/data
     networks:
       - queryai
     healthcheck:
