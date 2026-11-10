@@ -5,7 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { query } from "@/lib/db";
 import { ensureAuthTables } from "@/lib/ensureAuthTables";
-import { authBaseUrl, githubOAuthCreds, googleOAuthCreds, oauthCallbackUrls } from "@/lib/oauthEnv";
+import { githubOAuthCreds, googleOAuthCreds, oauthCallbackUrls } from "@/lib/oauthEnv";
 import { notifyAdminLogin } from "@/lib/notifyLogin";
 
 function buildProviders(): NextAuthOptions["providers"] {
@@ -66,7 +66,6 @@ function buildProviders(): NextAuthOptions["providers"] {
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
-  url: authBaseUrl(),
   providers: buildProviders(),
   pages: {
     signIn: "/auth",

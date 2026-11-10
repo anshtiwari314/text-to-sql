@@ -31,7 +31,7 @@ Expo app with the same signed-in product as `/app` (no landing page).
 |-----|--------|
 | `/` | Public landing (`client/public/landing.html` iframe) |
 | `/auth` | Sign in / sign up / forgot password |
-| `/app` | Main QueryAI app (session required; redirects to `/auth` if logged out) |
+| `/app` | Main QueryAI app (`AppGate` client session → `/auth` if logged out; no server `getServerSession` in build) |
 | `/login` | Redirect → `/auth` |
 | `/reset-password?token=…` | Set new password from email link |
 
