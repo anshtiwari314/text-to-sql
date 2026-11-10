@@ -21,14 +21,8 @@ services:
       context: ./server
       dockerfile: Dockerfile
     restart: unless-stopped
-    environment:
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
-      HISTORY_LIMIT: ${HISTORY_LIMIT:-4}
-      MAX_ROWS: ${MAX_ROWS:-200}
-      QUERY_TIMEOUT_MS: ${QUERY_TIMEOUT_MS:-15000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    env_file:
+      - ./server/.env
     networks:
       - queryai
 
@@ -37,25 +31,14 @@ services:
       context: ./client
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file:
+      - ./client/.env
     environment:
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-dev-secret-change-me}
+      # Overrides localhost URLs from client/.env for the Docker network.
       DATABASE_URL: postgres://${POSTGRES_USER:-sqlapp}:${POSTGRES_PASSWORD:-sqlapp}@postgres:5432/${POSTGRES_DB:-sql_app}
       FLASK_URL: http://server:8000
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GITHUB_ID: ${GITHUB_ID:-}
-      GITHUB_SECRET: ${GITHUB_SECRET:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
-      ADMIN_EMAIL_ID: ${ADMIN_EMAIL_ID:-}
-      NON_ADMIN_QUERY_LIMIT: ${NON_ADMIN_QUERY_LIMIT:-5}
     ports:
-      - "${CLIENT_PORT:-3000}:3000"
+      - "3000:3000"
     networks:
       - queryai
     depends_on:

@@ -194,13 +194,14 @@ flowchart LR
 - `docker-compose.yml`: **postgres**, **server** (Flask), **client** (Next) on shared bridge network **`queryai`**. Only **client** publishes a host port (`CLIENT_PORT`, default 3000). Postgres and Flask are not exposed on the host.
 - `server/Dockerfile` — Python 3.11 + gunicorn `app:app`.
 - `client/Dockerfile` — multi-stage Next `standalone` (`output: "standalone"` in `next.config.ts`).
-- Env template: `compose.env.example` → `docker compose --env-file compose.env up --build`.
-- In compose, `DATABASE_URL` → `postgres:5432`; `FLASK_URL` → `http://server:8000` (server-side fetch from Next).
+- Env: **`client/.env`** and **`server/.env`** via `env_file` (copy from `.env.example`). No `compose.env`.
+- Compose overrides on **client** only: `DATABASE_URL` → `postgres:5432`, `FLASK_URL` → `http://server:8000`. Set `NEXTAUTH_URL` to how you open the app (e.g. `http://192.168.1.42:3000` on LAN).
+- Run: `docker compose up --build` from repo root (requires `client/.env` and `server/.env` to exist).
 - Browser still uses `NEXTAUTH_URL=http://localhost:3000` (host port mapping).
 
 ## Git ignore
 
-- Single root `.gitignore` covers **client**, **server**, **mobileApp**, and Docker (`compose.env`). Templates: `.env.example`, `compose.env.example`.
+- Single root `.gitignore` covers **client**, **server**, **mobileApp**. Templates: `.env.example` in each app folder.
 - `server/data/` is ignored (agent session logs).
 - **`docs/memplace.md` is tracked and pushed.** `mempalace.yaml` / `entities.json` are the MemPalace tool cache only; those stay ignored.
 
