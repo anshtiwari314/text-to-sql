@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { query } from '@/lib/db';
-import { authOptions } from '@/lib/authOptions';
+import { getRequestUser } from '@/lib/getRequestUser';
 
 /**
  * Update an existing connection's configuration (/api/databases/[id]).
  * An empty password means "keep the saved one", so the form doesn't have to show it.
  */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getRequestUser(req);
+  console.log("[api] databases PUT", user?.email || "anonymous");
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -30,7 +30,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
        RETURNING id, conn_name, engine, host, port, db_name`,
       [
         id,
-        session.user.id,
+        user.id,
         conn_name ?? null,
         engine ?? null,
         host ?? null,

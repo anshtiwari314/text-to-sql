@@ -1,0 +1,23 @@
+2026-11-04 — React Native app (mobileApp)
+- Expo app mirrors the signed-in site: auth, reset, chat, history, database configuration, schemas. No landing page.
+- mobileApp/.env sets EXPO_PUBLIC_API_URL=http://localhost:3000.
+- client/lib/mobileToken.ts + getRequestUser.ts: bearer token for the phone; website cookie session unchanged.
+- Routes: /api/auth/mobile/login, /me, /handoff; /auth/mobile starts Google/GitHub.
+- databases, chats, schema, fullfill_query accept the bearer token.
+- Forgot email also includes sqlai://reset-password.
+- client/proxy.ts adds CORS for the Expo web build.
+- Verified on Expo web: sign-in, forgot, reset screen, chat warning, history, config, connect form, schemas, sign-out.
+
+2026-11-04 — Google/GitHub buttons and env example
+- Auth screen shows Google and GitHub even if the providers request fails. They hide only when the Next server says that provider is off.
+- mobileApp/.env.example documents EXPO_PUBLIC_API_URL (Next server). .gitignore keeps .env ignored and allows .env.example.
+
+2026-11-04 — Native Google/GitHub and header
+- @react-native-google-signin/google-signin and react-native-app-auth, plugins in mobileApp/app.config.js.
+- POST /api/auth/mobile/google verifies idToken. POST /api/auth/mobile/github/token exchanges the code and returns the app JWT.
+- Header: single database dropdown on the left, profile circle on the right. Sign out is on the profile screen.
+- OAuth buttons show Google and GitHub icons.
+
+2026-11-05 — Chat header and empty state
+- Chat header: SQL AI | database dropdown | profile circle. History/Config/Schemas: SQL AI | profile only.
+- Empty chat: "What data do you need?" vertically centered above the composer.

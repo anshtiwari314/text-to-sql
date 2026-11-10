@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { query } from '@/lib/db';
 import { callFlask } from '@/lib/flask';
-import { authOptions } from '@/lib/authOptions';
+import { getRequestUser } from '@/lib/getRequestUser';
 
 /**
  * STEP 1: the user picked a database in the UI.
@@ -11,8 +10,9 @@ import { authOptions } from '@/lib/authOptions';
  * 3. return the schema text (the browser keeps it for the chat)
  */
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getRequestUser(req);
+  console.log("[api] schema POST", user?.email || "anonymous");
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const dbResult = await query(
     `SELECT engine, host, port, db_name, db_username, db_password
      FROM saved_databases WHERE id = $1 AND user_id = $2`,
-    [databaseId, session.user.id]
+    [databaseId, user.id]
   );
 
   if (dbResult.rows.length === 0) {

@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 
-export async function sendResetEmail(to: string, link: string) {
+export async function sendResetEmail(to: string, link: string, appLink?: string) {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
@@ -23,7 +23,7 @@ export async function sendResetEmail(to: string, link: string) {
     from,
     to,
     subject: 'Reset your SQL AI password',
-    text: `Open this link to set a new password (valid for 1 hour):\n\n${link}\n`,
-    html: `<p>Open this link to set a new password (valid for 1 hour):</p><p><a href="${link}">${link}</a></p>`,
+    text: `Open this link to set a new password (valid for 1 hour):\n\n${link}\n${appLink ? `\nOn the phone app:\n${appLink}\n` : ""}`,
+    html: `<p>Open this link to set a new password (valid for 1 hour):</p><p><a href="${link}">${link}</a></p>${appLink ? `<p>Phone app: <a href="${appLink}">${appLink}</a></p>` : ""}`,
   });
 }

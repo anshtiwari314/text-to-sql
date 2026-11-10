@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { query } from '@/lib/db';
 import { ensureChatTables } from '@/lib/ensureChatTables';
-import { authOptions } from '@/lib/authOptions';
+import { getRequestUser } from '@/lib/getRequestUser';
 
 /** List saved chat sessions for the signed-in user. */
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+export async function GET(req: Request) {
+  const user = await getRequestUser(req);
+  console.log("[api] chats GET", user?.email || "anonymous");
+  if (!user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -20,7 +20,7 @@ export async function GET() {
        JOIN saved_databases d ON d.id = s.database_id
        WHERE s.user_id = $1
        ORDER BY s.updated_at DESC`,
-      [session.user.id]
+      [user.id]
     );
     return NextResponse.json({ chats: result.rows });
   } catch (error) {
@@ -31,8 +31,9 @@ export async function GET() {
 
 /** Start an empty chat session (New Chat). */
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getRequestUser(req);
+  console.log("[api] chats POST", user?.email || "anonymous");
+  if (!user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
 
   const db = await query(
     `SELECT id FROM saved_databases WHERE id = $1 AND user_id = $2`,
-    [databaseId, session.user.id]
+    [databaseId, user.id]
   );
   if (db.rows.length === 0) {
     return NextResponse.json({ error: 'Database not found' }, { status: 404 });
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     const created = await query(
       `INSERT INTO chat_sessions (user_id, database_id, title)
        VALUES ($1, $2, $3) RETURNING id, title, database_id, created_at`,
-      [session.user.id, databaseId, title]
+      [user.id, databaseId, title]
     );
     return NextResponse.json({ chat: created.rows[0] });
   } catch (error) {

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { query } from '@/lib/db';
 import { ensureChatTables } from '@/lib/ensureChatTables';
 import { callFlask } from '@/lib/flask';
-import { authOptions } from '@/lib/authOptions';
+import { getRequestUser } from '@/lib/getRequestUser';
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await getRequestUser(req);
+  console.log("[api] fullfill_query POST", user?.email || "anonymous");
+  if (!user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     const dbResult = await query(
       `SELECT engine, host, port, db_name, db_username, db_password
        FROM saved_databases WHERE id = $1 AND user_id = $2`,
-      [databaseId, session.user.id]
+      [databaseId, user.id]
     );
 
     if (dbResult.rows.length === 0) {
@@ -48,13 +48,13 @@ export async function POST(req: Request) {
       const created = await query(
         `INSERT INTO chat_sessions (user_id, database_id, title)
          VALUES ($1, $2, $3) RETURNING id`,
-        [session.user.id, databaseId, title]
+        [user.id, databaseId, title]
       );
       sessionId = created.rows[0].id;
     } else {
       await query(
         `UPDATE chat_sessions SET updated_at = now() WHERE id = $1 AND user_id = $2`,
-        [sessionId, session.user.id]
+        [sessionId, user.id]
       );
     }
 

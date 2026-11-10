@@ -4,3 +4,4 @@
 - TextToSqlApp, Sidebar, Header, ChatView: same glow, logo, and composer border.
 - ResetPasswordForm uses the same backdrop.
 - globals.css background set to #020617.
+- docs/memplace.md: Theme section, dark-input pitfall, LandingGlow in key files.

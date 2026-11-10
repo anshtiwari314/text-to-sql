@@ -24,8 +24,10 @@ export async function POST(req: Request) {
       );
       const base = process.env.NEXTAUTH_URL || 'http://localhost:3000';
       const link = `${base}/reset-password?token=${token}`;
+      const scheme = (process.env.MOBILE_APP_SCHEME || 'sqlai').replace('://', '');
+      const appLink = `${scheme}://reset-password?token=${token}`;
       console.log('[forgot] sending reset link to', dbEmail);
-      await sendResetEmail(dbEmail, link);
+      await sendResetEmail(dbEmail, link, appLink);
     } else {
       console.log('[forgot] no user for email (no mail sent)');
     }

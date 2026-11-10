@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
+import { getRequestUser } from '@/lib/getRequestUser';
 
 export async function GET(req: Request) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.id) {
+  const user = await getRequestUser(req);
+  console.log("[api] databases GET", user?.email || "anonymous");
+
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
         read_only
       FROM saved_databases 
       WHERE user_id = $1`,
-      [session.user.id]
+      [user.id]
     );
 
     const databases = result.rows.map(row => ({
@@ -40,10 +40,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  // 1. Verify user session
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.id) {
+  const user = await getRequestUser(req);
+  console.log("[api] databases POST", user?.email || "anonymous");
+
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       `INSERT INTO saved_databases 
       (user_id, conn_name, engine, host, port, db_username, db_password, db_name) 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [session.user.id, conn_name, engine, host, port, db_username, db_password, db_name]
+      [user.id, conn_name, engine, host, port, db_username, db_password, db_name]
     );
 
     return NextResponse.json({ 

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { ensureChatTables } from '@/lib/ensureChatTables';
 import { query } from '@/lib/db';
-import { authOptions } from '@/lib/authOptions';
+import { getRequestUser } from '@/lib/getRequestUser';
 
 /** Load one chat session and all messages. */
-export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getRequestUser(req);
+  console.log("[api] chats/[id] GET", user?.email || "anonymous");
+  if (!user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -20,7 +20,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
        FROM chat_sessions s
        JOIN saved_databases d ON d.id = s.database_id
        WHERE s.id = $1 AND s.user_id = $2`,
-      [id, session.user.id]
+      [id, user.id]
     );
     if (chat.rows.length === 0) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });

@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "SQL AI",
+    "slug": "sql-ai",
+    "scheme": "sqlai",
+    "owner":"anshtiwari314",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#020617",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sqlai.app"
+    },
+    
+    "android": {
+      "package": "com.sqlai.app",
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#020617",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b51678f3-1711-4a3f-a9ad-3a52205b268d"
+      }
+    }
+  }
+}
