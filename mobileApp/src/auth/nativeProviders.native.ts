@@ -1,6 +1,7 @@
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { authorize } from "react-native-app-auth";
 import { API_URL } from "../api";
+import { clientClock } from "../clientClock";
 
 const GITHUB_REDIRECT = "sqlai://oauth/github";
 
@@ -28,7 +29,7 @@ export async function signInWithGoogle() {
   const res = await fetch(`${API_URL}/api/auth/mobile/google`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ idToken, ...clientClock() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.token) {
@@ -49,7 +50,7 @@ export async function signInWithGitHub() {
     additionalHeaders: { Accept: "application/json" },
     serviceConfiguration: {
       authorizationEndpoint: "https://github.com/login/oauth/authorize",
-      tokenEndpoint: `${API_URL}/api/auth/mobile/github/token`,
+      tokenEndpoint: `${API_URL}/api/auth/mobile/github/token?local_time=${encodeURIComponent(clientClock().localTime)}&timezone=${encodeURIComponent(clientClock().timezone)}`,
     },
   });
   if (!result.accessToken) throw new Error("GitHub sign-in did not return a session");

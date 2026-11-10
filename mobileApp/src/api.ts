@@ -1,3 +1,4 @@
+import { clientClock } from "./clientClock";
 import { AuthUser } from "./types";
 
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -29,6 +30,6 @@ export async function api<T = Record<string, unknown>>(path: string, opts: Reque
 export async function loginRequest(email: string, password: string) {
   return api<{ token: string; user: AuthUser }>("/api/auth/mobile/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...clientClock() }),
   });
 }

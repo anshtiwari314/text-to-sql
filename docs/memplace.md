@@ -17,7 +17,7 @@ Expo app with the same signed-in product as `/app` (no landing page).
 - Native Google: `@react-native-google-signin/google-signin` returns an idToken, `POST /api/auth/mobile/google` checks it and returns the app session token.
 - Native GitHub: `react-native-app-auth` sends the code to `POST /api/auth/mobile/github/token` (client secret stays on the Next server). Redirect to register on the GitHub OAuth App: `sqlai://oauth/github`.
 - These native modules need a dev build (`npx expo run:android`), not Expo Go. The web build still uses the browser handoff.
-- Header (Chat tab): SQL AI on the left, database dropdown in the center, profile circle on the right. Other tabs: SQL AI and profile only (no database dropdown). Sign out is on Profile.
+- Header (Chat tab): QueryAI on the left, database dropdown in the center, profile circle on the right. Other tabs: QueryAI and profile only (no database dropdown). Sign out is on Profile.
 - Email login: `POST /api/auth/mobile/login` → bearer token (`client/lib/mobileToken.ts`). Website still uses the NextAuth cookie.
 - Google/GitHub: browser opens `/auth/mobile`, then `/api/auth/mobile/handoff` redirects to `sqlai://auth?token=` (or the Expo Go `exp://` return URL).
 - APIs accept `Authorization: Bearer` via `getRequestUser` (databases, chats, schema, fullfill_query).
@@ -31,7 +31,7 @@ Expo app with the same signed-in product as `/app` (no landing page).
 |-----|--------|
 | `/` | Public landing (`client/public/landing.html` iframe) |
 | `/auth` | Sign in / sign up / forgot password |
-| `/app` | Main SQL AI app (session required; redirects to `/auth` if logged out) |
+| `/app` | Main QueryAI app (session required; redirects to `/auth` if logged out) |
 | `/login` | Redirect → `/auth` |
 | `/reset-password?token=…` | Set new password from email link |
 
@@ -48,7 +48,17 @@ Landing **Sign in** / **Get Started** links → `/auth`. After OAuth or email lo
 - **SessionProvider** in `StoreProvider` for client `signIn()`.
 - OAuth redirect URIs: `{NEXTAUTH_URL}/api/auth/callback/google` and `…/github` (must match GitHub **OAuth App**, not GitHub App).
 
-**Client env** (see `client/.env.example`): `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_*`, `GITHUB_*`, `DATABASE_URL`, `FLASK_URL`, `SMTP_*` (`SMTP_FROM` = visible From address; defaults to `SMTP_USER`).
+**Client env** (see `client/.env.example`): `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_*`, `GITHUB_*`, `DATABASE_URL`, `FLASK_URL`, `SMTP_*` (`SMTP_FROM` = visible From address; defaults to `SMTP_USER`), **`ADMIN_EMAIL_ID`**.
+
+**Query cap:** non-admin users capped at **`NON_ADMIN_QUERY_LIMIT`** (default 5) on `POST /api/fullfill_query` (count `chat_messages.role = user`). `ADMIN_EMAIL_ID` is unlimited. Header shows “N queries left” via `GET /api/query-quota` (hidden for admin).
+
+**Login mail:** only the **first** sign-in of a new user emails `ADMIN_EMAIL_ID` (subject `New login`). Returning logins are not mailed.
+
+**Login log (Postgres):**
+- **`users.welcome_mailed`** (column on `users`, not on `user_logins`): `false` until first sign-in admin mail is sent, then `true`. Not in `client/prisma/schema.prisma` — added at runtime / via SQL script.
+- **`user_logins`** (table): one row per sign-in — `email`, `method`, `location`, `local_time`, `timezone`, `created_at` (server). No `welcome_mailed` column here.
+- Manual schema: `psql "$DATABASE_URL" -f client/scripts/ensure_login_schema.sql`
+- Browser cookies on `/auth`: `qai_geo`, `qai_local`, `qai_tz`.
 
 **Server env** (`server/.env`): `OPENROUTER_API_KEY=sk-or-...` **no extra quotes** (``""key""`` breaks dotenv). Loaded via `server/core/config.py` absolute path.
 
@@ -181,7 +191,7 @@ flowchart LR
 
 ## Docker (repo root)
 
-- `docker-compose.yml`: **postgres** (app DB), **server** (Flask :8000), **client** (Next :3000).
+- `docker-compose.yml`: **postgres**, **server** (Flask), **client** (Next) on shared bridge network **`queryai`**. Only **client** publishes a host port (`CLIENT_PORT`, default 3000). Postgres and Flask are not exposed on the host.
 - `server/Dockerfile` — Python 3.11 + gunicorn `app:app`.
 - `client/Dockerfile` — multi-stage Next `standalone` (`output: "standalone"` in `next.config.ts`).
 - Env template: `compose.env.example` → `docker compose --env-file compose.env up --build`.
@@ -191,3 +201,16 @@ flowchart LR
 ## Git ignore
 
 - Single root `.gitignore` covers **client**, **server**, **mobileApp**, and Docker (`compose.env`). Templates: `.env.example`, `compose.env.example`.
+- `server/data/` is ignored (agent session logs).
+- **`docs/memplace.md` is tracked and pushed.** `mempalace.yaml` / `entities.json` are the MemPalace tool cache only; those stay ignored.
+
+## SEO (no UI change)
+
+- Brand in **meta / JSON-LD / OG**: **QueryAI** (text-to-SQL AI).
+- Databases listed for crawlers: PostgreSQL, MySQL, MariaDB, SQLite, Microsoft SQL Server (`client/lib/site.ts`, `client/lib/seo.tsx`).
+- Next metadata on `/` (`layout.tsx`), `/robots.txt`, `/sitemap.xml`, `/manifest.webmanifest`, `opengraph-image`, JSON-LD `SoftwareApplication` + FAQ.
+- `/landing.html` head has matching meta + canonical `/`. Wordmark on `/auth`, sidebar, and mobile is **QueryAI**.
+- `/app` is `noindex`.
+
+2026-11-10 — Git ignore / memplace
+- Ignore `server/data/` (session logs). Keep `docs/memplace.md` in git.

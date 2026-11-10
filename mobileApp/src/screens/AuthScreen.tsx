@@ -93,7 +93,7 @@ export function AuthScreen({ navigation }: Props) {
         <Text style={styles.markText}>⚡</Text>
       </LinearGradient>
       <Text style={styles.word}>
-        SQL<Text style={styles.wordAi}>AI</Text>
+        Query<Text style={styles.wordAi}>AI</Text>
       </Text>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.sub}>

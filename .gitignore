@@ -79,6 +79,11 @@ htmlcov/
 # ── Prisma local overrides ─────────────────────────────────────────────────────
 .prisma/local.json
 
-# ── Misc project tooling ─────────────────────────────────────────────────────
+# ── Flask / agent local data (session logs, not source) ──────────────────────
+server/data/
+
+# ── MemPalace tool cache (NOT the project memory file) ───────────────────────
+# docs/memplace.md is committed and pushed. Do not ignore it.
 mempalace.yaml
 entities.json
+!docs/memplace.md

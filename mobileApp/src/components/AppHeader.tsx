@@ -6,14 +6,14 @@ import { useApp } from "../AppContext";
 import { colors } from "../theme";
 
 type Props = {
-  /** Chat tab: SQL AI | database dropdown | profile. Other tabs: SQL AI | profile only. */
+  /** Chat tab: QueryAI | database dropdown | profile. Other tabs: QueryAI | profile only. */
   mode?: "chat" | "default";
 };
 
 function BrandMark() {
   return (
     <Text style={styles.brand}>
-      SQL<Text style={styles.brandAi}>AI</Text>
+      Query<Text style={styles.brandAi}>AI</Text>
     </Text>
   );
 }

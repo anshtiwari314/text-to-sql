@@ -8,8 +8,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-sql_app}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - queryai
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
@@ -29,8 +29,8 @@ services:
       MAX_ROWS: ${MAX_ROWS:-200}
       QUERY_TIMEOUT_MS: ${QUERY_TIMEOUT_MS:-15000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-    ports:
-      - "${FLASK_PORT:-8000}:8000"
+    networks:
+      - queryai
 
   client:
     build:
@@ -52,13 +52,21 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      ADMIN_EMAIL_ID: ${ADMIN_EMAIL_ID:-}
+      NON_ADMIN_QUERY_LIMIT: ${NON_ADMIN_QUERY_LIMIT:-5}
     ports:
       - "${CLIENT_PORT:-3000}:3000"
+    networks:
+      - queryai
     depends_on:
       postgres:
         condition: service_healthy
       server:
         condition: service_started
+
+networks:
+  queryai:
+    driver: bridge
 
 volumes:
   postgres_data:
