@@ -18,12 +18,18 @@ export async function POST(req: Request) {
 
     await ensureAuthTables();
     const found = await query(
-      "SELECT id, name, email, image, password_hash FROM users WHERE email = $1",
+      "SELECT id, name, email, image, password_hash, email_verified FROM users WHERE LOWER(email) = LOWER($1)",
       [email]
     );
     const row = found.rows[0];
     if (!row?.password_hash) {
       return NextResponse.json({ error: "Email or password is incorrect" }, { status: 401 });
+    }
+    if (!row.email_verified) {
+      return NextResponse.json(
+        { error: "Verify your email from the signup link before signing in." },
+        { status: 403 }
+      );
     }
     const ok = await bcrypt.compare(password, row.password_hash);
     if (!ok) {

@@ -41,7 +41,8 @@ Landing **Sign in** / **Get Started** links → `/auth`. After OAuth or email lo
 
 - **NextAuth** (`client/lib/authOptions.ts`, handler in `client/app/api/auth/[...nextauth]/route.ts`): Google and GitHub only if env vars set; email **Credentials** always.
 - **OAuth** upserts `users` (name, email, image); **credentials** use `password_hash` on `users` (`ensureAuthTables`).
-- **Sign up**: `POST /api/auth/signup` (bcrypt hash).
+- **Sign up**: `POST /api/auth/signup` (bcrypt hash, `email_verified=false`, verification mail → `/verify-email?token=`). Password login blocked until verified; Google/GitHub count as verified.
+- **Email OTP**: `POST /api/auth/otp/send` + NextAuth provider `email-otp` (web) or `POST /api/auth/mobile/otp/verify` (mobile). Creates account if new; 10-minute 6-digit code.
 - **Forgot**: `POST /api/auth/forgot` → Nodemailer reset link → `password_resets` (1h token). Sends for **any registered email** (OAuth-only users too); reset sets `password_hash`.
 - **Reset**: `POST /api/auth/reset` with token + new password.
 - **`/auth` page**: client `useSession` redirect to `/app` when logged in (no server `getServerSession` — avoids Next 16 `cacheComponents` conflict).

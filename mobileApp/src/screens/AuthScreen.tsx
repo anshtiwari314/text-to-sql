@@ -10,7 +10,8 @@ import { GitHubIcon, GoogleIcon } from "../components/OAuthIcons";
 import { AuthStackParamList } from "../nav/types";
 import { colors } from "../theme";
 
-type Mode = "login" | "signup" | "forgot";
+type Mode = "login" | "signup" | "forgot" | "otp";
+type OtpStep = "email" | "code";
 type Props = NativeStackScreenProps<AuthStackParamList, "Auth">;
 
 export function AuthScreen({ navigation }: Props) {
@@ -22,6 +23,8 @@ export function AuthScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [otpStep, setOtpStep] = useState<OtpStep>("email");
+  const [otpCode, setOtpCode] = useState("");
   const [showGoogle, setShowGoogle] = useState(true);
   const [showGitHub, setShowGitHub] = useState(true);
 
@@ -62,6 +65,24 @@ export function AuthScreen({ navigation }: Props) {
     setBusy(true);
     console.log("[mobile] auth submit", mode);
     try {
+      if (mode === "otp") {
+        if (otpStep === "email") {
+          const data = await api<{ message?: string }>("/api/auth/otp/send", {
+            method: "POST",
+            body: JSON.stringify({ email }),
+          });
+          setInfo(data.message || "Check your email for the code.");
+          setOtpStep("code");
+          return;
+        }
+        const data = await api<{ token: string; user: { id: string; name: string; email: string } }>(
+          "/api/auth/mobile/otp/verify",
+          { method: "POST", body: JSON.stringify({ email, code: otpCode, name }) }
+        );
+        await signInWithToken(data.token, data.user);
+        return;
+      }
+
       if (mode === "forgot") {
         const data = await api<{ message?: string }>("/api/auth/forgot", {
           method: "POST",
@@ -71,10 +92,15 @@ export function AuthScreen({ navigation }: Props) {
         return;
       }
       if (mode === "signup") {
-        await api("/api/auth/signup", {
+        const signup = await api<{ needsVerification?: boolean; message?: string }>("/api/auth/signup", {
           method: "POST",
           body: JSON.stringify({ name, email, password }),
         });
+        if (signup.needsVerification) {
+          setInfo(signup.message || "Verify your email before signing in.");
+          setMode("login");
+          return;
+        }
       }
       const data = await loginRequest(email.trim(), password);
       await signInWithToken(data.token, data.user);
@@ -85,7 +111,16 @@ export function AuthScreen({ navigation }: Props) {
     }
   };
 
-  const title = mode === "login" ? "Welcome back" : mode === "signup" ? "Create an account" : "Reset password";
+  const title =
+    mode === "login"
+      ? "Welcome back"
+      : mode === "signup"
+        ? "Create an account"
+        : mode === "otp"
+          ? otpStep === "email"
+            ? "Sign in with OTP"
+            : "Enter your code"
+          : "Reset password";
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
@@ -100,7 +135,7 @@ export function AuthScreen({ navigation }: Props) {
         {mode === "forgot" ? "We will email you a one-time link." : "Use Google, GitHub, or email."}
       </Text>
 
-      {mode !== "forgot" && (showGoogle || showGitHub) && (
+      {mode !== "forgot" && mode !== "otp" && (
         <View style={styles.oauth}>
           {showGoogle && (
             <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" style={[styles.oauthBtn, styles.google]} onPress={() => void oauth("google")}>
@@ -114,11 +149,40 @@ export function AuthScreen({ navigation }: Props) {
               <Text style={styles.oauthText}>Continue with GitHub</Text>
             </Pressable>
           )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Sign in with Email OTP"
+            style={[styles.oauthBtn, styles.otp]}
+            onPress={() => {
+              setOtpStep("email");
+              setOtpCode("");
+              setError(null);
+              setInfo(null);
+              setMode("otp");
+            }}
+          >
+            <Text style={styles.otpMark}>✉</Text>
+            <Text style={styles.oauthText}>
+              {mode === "signup" ? "Sign up with Email OTP" : "Sign in with Email OTP"}
+            </Text>
+          </Pressable>
         </View>
       )}
 
       {mode === "signup" && (
         <Field label="Full name" value={name} onChangeText={setName} placeholder="Jane Doe" />
+      )}
+      {mode === "otp" && otpStep === "email" && (
+        <Field label="Name (optional)" value={name} onChangeText={setName} placeholder="Jane Doe" />
+      )}
+      {mode === "otp" && otpStep === "code" && (
+        <Field
+          label="6-digit code"
+          value={otpCode}
+          onChangeText={(t) => setOtpCode(t.replace(/\D/g, "").slice(0, 6))}
+          keyboardType="number-pad"
+          placeholder="123456"
+        />
       )}
       <Field
         label="Email address"
@@ -128,7 +192,7 @@ export function AuthScreen({ navigation }: Props) {
         keyboardType="email-address"
         placeholder="you@company.com"
       />
-      {mode !== "forgot" && (
+      {mode !== "forgot" && mode !== "otp" && (
         <Field
           label="Password"
           value={password}
@@ -150,17 +214,33 @@ export function AuthScreen({ navigation }: Props) {
           <ActivityIndicator color="white" />
         ) : (
           <Text style={styles.primaryText}>
-            {mode === "login" ? "Sign In" : mode === "signup" ? "Create Account" : "Send reset link"}
+            {mode === "login"
+              ? "Sign In"
+              : mode === "signup"
+                ? "Create Account"
+                : mode === "otp"
+                  ? otpStep === "email"
+                    ? "Send code"
+                    : "Verify & sign in"
+                  : "Send reset link"}
           </Text>
         )}
       </Pressable>
 
-      {mode === "login" ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Don't have an account? Sign up" onPress={() => setMode("signup")}>
+      {mode === "login" && (
+        <Pressable accessibilityRole="button" onPress={() => setMode("signup")}>
           <Text style={styles.link}>Don't have an account? Sign up</Text>
         </Pressable>
-      ) : (
-        <Pressable accessibilityRole="button" accessibilityLabel="Back to sign in" onPress={() => setMode("login")}>
+      )}
+      {mode !== "login" && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setMode("login");
+            setOtpStep("email");
+            setOtpCode("");
+          }}
+        >
           <Text style={styles.link}>Back to sign in</Text>
         </Pressable>
       )}
@@ -193,6 +273,8 @@ const styles = StyleSheet.create({
   },
   google: { backgroundColor: "#ffffff", borderColor: "#e2e8f0" },
   github: { backgroundColor: "#24292F", borderColor: "#24292F" },
+  otp: { backgroundColor: "#0f172a", borderColor: "#6366f1" },
+  otpMark: { color: "#67e8f9", fontSize: 18, fontWeight: "700" },
   googleText: { color: "#0f172a", fontWeight: "700" },
   oauthText: { color: "#ffffff", fontWeight: "700" },
   link: { color: colors.indigoSoft, fontWeight: "700", marginBottom: 12 },

@@ -1,5 +1,16 @@
 # Test cases log
 
+## TC-AUTH-VERIFY-001 — Signup verification email
+- **When** user signs up with email/password and SMTP is configured
+- **Then** user is not signed in immediately; message asks to check email
+- **When** user opens `/verify-email?token=` from email
+- **Then** `users.email_verified` is true and user can password-sign-in
+
+## TC-AUTH-OTP-001 — Email OTP sign-in
+- **When** user chooses OTP, enters email, receives code, enters code
+- **Then** user is signed in (web session or mobile bearer token)
+- **And** new email creates a user without password
+
 ## TC-MYSQL-NGROK-001 — Local MySQL via ngrok matches LAN
 - **Given** MySQL on `192.168.1.42:5246`, db `first_db`, ngrok `tcp -> localhost:5246` (e.g. `0.tcp.in.ngrok.io:24026`)
 - **When** `server/scripts/verify_mysql_connection.py` runs with `MYSQL_PASSWORD` set

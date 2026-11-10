@@ -34,7 +34,7 @@ export async function upsertOAuthUser(input: {
   }
 
   const created = await query(
-    "INSERT INTO users (name, email, image, welcome_mailed) VALUES ($1, $2, $3, false) RETURNING id, name, email, image",
+    "INSERT INTO users (name, email, image, email_verified, welcome_mailed) VALUES ($1, $2, $3, true, false) RETURNING id, name, email, image",
     [input.name || email, email, input.image || null]
   );
   const row = created.rows[0];

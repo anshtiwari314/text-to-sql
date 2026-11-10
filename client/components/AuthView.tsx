@@ -2,14 +2,15 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Zap, Mail, ArrowRight } from "lucide-react";
+import { Zap, Mail, ArrowRight, KeyRound } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { GoogleIcon, GitHubIcon } from "@/components/OAuthBrandIcons";
 import LandingGlow from "@/components/LandingGlow";
 import { requestLoginLocation, stampLoginClient } from "@/lib/requestLoginLocation";
 
-type Mode = "login" | "signup" | "forgot";
+type Mode = "login" | "signup" | "forgot" | "otp";
+type OtpStep = "email" | "code";
 
 const inputClass =
   "w-full border border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500";
@@ -46,6 +47,17 @@ export default function AuthView() {
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
+  const [otpStep, setOtpStep] = useState<OtpStep>("email");
+  const [otpCode, setOtpCode] = useState("");
+  const [pendingVerification, setPendingVerification] = useState(false);
+
+  const verified = searchParams.get("verified");
+  useEffect(() => {
+    if (verified === "1") {
+      setInfo("Email verified. You can sign in now.");
+      setPendingVerification(false);
+    }
+  }, [verified]);
 
   const oauthError = searchParams.get("error");
   const oauthHint = useMemo(() => {
@@ -79,6 +91,31 @@ export default function AuthView() {
     setInfo(null);
     setBusy(true);
     try {
+      if (mode === "otp") {
+        if (otpStep === "email") {
+          const res = await fetch("/api/auth/otp/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not send code");
+          setInfo(data.message || "Check your email for the 6-digit code.");
+          setOtpStep("code");
+          return;
+        }
+        stampLoginClient();
+        const result = await signIn("email-otp", {
+          email,
+          code: otpCode,
+          callbackUrl: "/app",
+          redirect: false,
+        });
+        if (result?.error) throw new Error("Invalid or expired code");
+        window.location.href = result?.url || "/app";
+        return;
+      }
+
       if (mode === "forgot") {
         const res = await fetch("/api/auth/forgot", {
           method: "POST",
@@ -99,6 +136,12 @@ export default function AuthView() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Could not sign up");
+        if (data.needsVerification) {
+          setInfo(data.message || "Check your inbox to verify your email before signing in.");
+          setPendingVerification(true);
+          setMode("login");
+          return;
+        }
       }
 
       stampLoginClient();
@@ -108,7 +151,12 @@ export default function AuthView() {
         callbackUrl: "/app",
         redirect: false,
       });
-      if (result?.error) throw new Error("Email or password is incorrect");
+      if (result?.error) {
+        setPendingVerification(true);
+        throw new Error(
+          "Email or password is incorrect, or your email is not verified yet. Check your inbox for the verification link."
+        );
+      }
       window.location.href = result?.url || "/app";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -162,9 +210,14 @@ export default function AuthView() {
               {mode === "login" && "Welcome back"}
               {mode === "signup" && "Create an account"}
               {mode === "forgot" && "Reset password"}
+              {mode === "otp" && (otpStep === "email" ? "Sign in with OTP" : "Enter your code")}
             </h2>
             <p className="text-slate-400">
-              {mode === "forgot" ? "We will email you a one-time link." : "Use Google, GitHub, or email."}
+              {mode === "forgot"
+                ? "We will email you a one-time link."
+                : mode === "otp"
+                  ? "Works for new and existing accounts."
+                  : "Use Google, GitHub, email, or OTP."}
             </p>
           </div>
 
@@ -180,7 +233,7 @@ export default function AuthView() {
             </div>
           )}
 
-          {mode !== "forgot" && (showGoogle || showGitHub) && (
+          {mode !== "forgot" && mode !== "otp" && (
             <div className="space-y-3 mb-8">
               {showGoogle && (
                 <button
@@ -208,6 +261,20 @@ export default function AuthView() {
                   Continue with GitHub
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpStep("email");
+                  setOtpCode("");
+                  setError(null);
+                  setInfo(null);
+                  setMode("otp");
+                }}
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-950/80 to-cyan-950/50 px-4 py-3 font-bold text-slate-100 shadow-md shadow-indigo-900/20 hover:border-indigo-400/60 hover:from-indigo-900/80 hover:to-cyan-900/50"
+              >
+                <KeyRound size={20} className="text-cyan-400" />
+                {mode === "signup" ? "Sign up with Email OTP" : "Sign in with Email OTP"}
+              </button>
             </div>
           )}
 
@@ -222,6 +289,23 @@ export default function AuthView() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Jane Doe"
+                  className={inputClass}
+                />
+              </div>
+            )}
+            {mode === "otp" && otpStep === "code" && (
+              <div>
+                <label className={labelClass} htmlFor="auth-otp">
+                  6-digit code
+                </label>
+                <input
+                  id="auth-otp"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="123456"
                   className={inputClass}
                 />
               </div>
@@ -243,7 +327,7 @@ export default function AuthView() {
                 />
               </div>
             </div>
-            {mode !== "forgot" && (
+            {mode !== "forgot" && mode !== "otp" && (
               <div>
                 <label className={labelClass} htmlFor="auth-password">
                   Password
@@ -268,25 +352,75 @@ export default function AuthView() {
               </div>
             )}
             {error && <p className="text-sm text-red-400">{error}</p>}
-            {info && <p className="text-sm text-emerald-400">{info}</p>}
+            {info && (
+              <div className="space-y-2">
+                <p className="text-sm text-emerald-400">{info}</p>
+                {pendingVerification && mode === "login" && (
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-indigo-300 hover:text-cyan-300"
+                    onClick={async () => {
+                      if (!email) {
+                        setError("Enter your email above first.");
+                        return;
+                      }
+                      const res = await fetch("/api/auth/resend-verification", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email }),
+                      });
+                      const data = await res.json();
+                      setInfo(data.message || "If the account is unverified, a new link was sent.");
+                    }}
+                  >
+                    Resend verification email
+                  </button>
+                )}
+              </div>
+            )}
             <button
               type="submit"
               disabled={busy}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 font-bold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-500 disabled:opacity-60"
             >
-              {busy ? "Working..." : mode === "login" ? "Sign In" : mode === "signup" ? "Create Account" : "Send reset link"}
+              {busy
+                ? "Working..."
+                : mode === "login"
+                  ? "Sign In"
+                  : mode === "signup"
+                    ? "Create Account"
+                    : mode === "otp"
+                      ? otpStep === "email"
+                        ? "Send code"
+                        : "Verify & sign in"
+                      : "Send reset link"}
               <ArrowRight size={18} />
             </button>
           </form>
 
-          <div className="mt-8 text-center text-sm text-slate-400">
+          <div className="mt-6 space-y-3 text-center text-sm text-slate-400">
             {mode === "login" && (
-              <button type="button" onClick={() => setMode("signup")} className="font-bold text-indigo-300 hover:text-cyan-300">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingVerification(false);
+                  setMode("signup");
+                }}
+                className="font-bold text-indigo-300 hover:text-cyan-300"
+              >
                 Don&apos;t have an account? Sign up
               </button>
             )}
-            {mode !== "login" && (
-              <button type="button" onClick={() => setMode("login")} className="font-bold text-indigo-300 hover:text-cyan-300">
+            {(mode === "signup" || mode === "forgot" || mode === "otp") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setOtpStep("email");
+                  setOtpCode("");
+                }}
+                className="font-bold text-indigo-300 hover:text-cyan-300"
+              >
                 Back to sign in
               </button>
             )}

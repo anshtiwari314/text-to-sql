@@ -7,6 +7,8 @@ import { query } from "@/lib/db";
 import { ensureAuthTables } from "@/lib/ensureAuthTables";
 import { githubOAuthCreds, googleOAuthCreds, oauthCallbackUrls } from "@/lib/oauthEnv";
 import { notifyAdminLogin } from "@/lib/notifyLogin";
+import { verifyEmailOtp } from "@/lib/emailOtpStore";
+import { ensureUserAfterOtp } from "@/lib/ensureUserAfterOtp";
 
 function buildProviders(): NextAuthOptions["providers"] {
   const list: NextAuthOptions["providers"] = [];
@@ -49,13 +51,38 @@ function buildProviders(): NextAuthOptions["providers"] {
 
         await ensureAuthTables();
         const found = await query(
-          "SELECT id, name, email, image, password_hash FROM users WHERE email = $1",
+          "SELECT id, name, email, image, password_hash, email_verified FROM users WHERE LOWER(email) = LOWER($1)",
           [email]
         );
         const row = found.rows[0];
         if (!row?.password_hash) return null;
         const ok = await bcrypt.compare(password, row.password_hash);
         if (!ok) return null;
+        if (!row.email_verified) {
+          console.log("[auth] credentials blocked unverified", email);
+          return null;
+        }
+        return { id: row.id, name: row.name, email: row.email, image: row.image };
+      },
+    }),
+    CredentialsProvider({
+      id: "email-otp",
+      name: "Email OTP",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        code: { label: "Code", type: "text" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email?.trim();
+        const code = credentials?.code?.trim();
+        if (!email || !code) return null;
+
+        const verifiedEmail = await verifyEmailOtp(email, code);
+        if (!verifiedEmail) {
+          console.log("[auth] otp sign-in rejected", email);
+          return null;
+        }
+        const row = await ensureUserAfterOtp(verifiedEmail);
         return { id: row.id, name: row.name, email: row.email, image: row.image };
       },
     })
@@ -94,7 +121,7 @@ export const authOptions: NextAuthOptions = {
           ]);
         } else {
           await query(
-            "INSERT INTO users (name, email, image, welcome_mailed) VALUES ($1, $2, $3, false)",
+            "INSERT INTO users (name, email, image, email_verified, welcome_mailed) VALUES ($1, $2, $3, true, false)",
             [user.name || email, email, user.image]
           );
         }
