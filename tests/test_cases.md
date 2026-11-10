@@ -1,5 +1,12 @@
 # Test cases log
 
+## TC-MYSQL-NGROK-001 — Local MySQL via ngrok matches LAN
+- **Given** MySQL on `192.168.1.42:5246`, db `first_db`, ngrok `tcp -> localhost:5246` (e.g. `0.tcp.in.ngrok.io:24026`)
+- **When** `server/scripts/verify_mysql_connection.py` runs with `MYSQL_PASSWORD` set
+- **Then** LAN and ngrok both pass TCP, pymysql login, and `fetch_schema` (same DDL length)
+- **When** QueryAI Configuration uses ngrok host + **current** ngrok port (not an old session port)
+- **Then** Schemas load for that connection
+
 ## TC-QUOTA-001 — Non-admin query cap
 - **Given** `ADMIN_EMAIL_ID` is set, `NON_ADMIN_QUERY_LIMIT=5`, and the signed-in user email is different
 - **When** that user opens `/app`

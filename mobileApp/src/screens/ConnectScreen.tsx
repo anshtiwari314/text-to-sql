@@ -23,29 +23,44 @@ export function ConnectScreen({ navigation }: Props) {
   const [dbName, setDbName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [inputMode, setInputMode] = useState<"fields" | "url">("fields");
+  const [connectionUrl, setConnectionUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    if (!connName || !host || !username || !password || !dbName) {
+    if (!connName) {
+      setError("Connection name is required.");
+      return;
+    }
+    if (inputMode === "url") {
+      if (!connectionUrl.trim()) {
+        setError("Paste a connection URL.");
+        return;
+      }
+    } else if (!host || !username || !password || !dbName) {
       setError("Please fill in all required fields.");
       return;
     }
     setBusy(true);
     setError(null);
-    console.log("[mobile] save database", engine, hostType);
+    console.log("[mobile] save database", engine, hostType, inputMode);
     try {
+      const body =
+        inputMode === "url"
+          ? { conn_name: connName, connection_url: connectionUrl.trim() }
+          : {
+              conn_name: connName,
+              engine,
+              host,
+              port: parseInt(port, 10) || 5432,
+              db_username: username,
+              db_password: password,
+              db_name: dbName,
+            };
       await api("/api/databases", {
         method: "POST",
-        body: JSON.stringify({
-          conn_name: connName,
-          engine,
-          host,
-          port: parseInt(port, 10) || 5432,
-          db_username: username,
-          db_password: password,
-          db_name: dbName,
-        }),
+        body: JSON.stringify(body),
       });
       await refreshDatabases();
       navigation.goBack();
@@ -83,6 +98,16 @@ export function ConnectScreen({ navigation }: Props) {
         <Text style={styles.link}>Back to engines</Text>
       </Pressable>
       <Text style={styles.h1}>Where is your {engine} hosted?</Text>
+      <Text style={styles.sub}>Enter each field, or paste one connection URL.</Text>
+      <View style={styles.hosts}>
+        <Pressable style={[styles.host, inputMode === "fields" && styles.hostOn]} onPress={() => setInputMode("fields")}>
+          <Text style={styles.hostText}>Fields</Text>
+        </Pressable>
+        <Pressable style={[styles.host, inputMode === "url" && styles.hostOn]} onPress={() => setInputMode("url")}>
+          <Text style={styles.hostText}>URL</Text>
+        </Pressable>
+      </View>
+      <View style={inputMode === "url" ? styles.hidden : undefined}>
       <View style={styles.hosts}>
         {HOSTS.map((item) => (
           <Pressable key={item} style={[styles.host, hostType === item && styles.hostOn]} onPress={() => setHostType(item)}>
@@ -90,14 +115,28 @@ export function ConnectScreen({ navigation }: Props) {
           </Pressable>
         ))}
       </View>
-      {hostType && (
+      </View>
+      {(inputMode === "url" || hostType) && (
         <View>
           <Field label="Connection name" value={connName} onChangeText={setConnName} placeholder="Production DB" />
-          <Field label="Host URL" value={host} onChangeText={setHost} autoCapitalize="none" placeholder={hostType === "Locally" ? "localhost" : "db.example.com"} />
+          {inputMode === "url" ? (
+            <Field
+              label="Connection URL"
+              value={connectionUrl}
+              onChangeText={setConnectionUrl}
+              autoCapitalize="none"
+              placeholder="postgresql://user:pass@host:5432/db"
+              multiline
+            />
+          ) : (
+            <>
+          <Field label="Host URL" value={host} onChangeText={setHost} autoCapitalize="none" placeholder={hostType === "Locally" ? "0.tcp.in.ngrok.io" : "db.example.com"} />
           <Field label="Port" value={port} onChangeText={setPort} keyboardType="number-pad" placeholder="5432" />
           <Field label="Database name" value={dbName} onChangeText={setDbName} autoCapitalize="none" placeholder="postgres" />
           <Field label="Username" value={username} onChangeText={setUsername} autoCapitalize="none" />
           <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+            </>
+          )}
           {error && <Text style={styles.error}>{error}</Text>}
           <Pressable style={styles.primary} disabled={busy} onPress={() => void save()}>
             <Text style={styles.primaryText}>{busy ? "Saving..." : "Save connection"}</Text>
@@ -123,4 +162,5 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, marginBottom: 8 },
   primary: { backgroundColor: colors.indigo, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
   primaryText: { color: "white", fontWeight: "800" },
+  hidden: { display: "none" },
 });

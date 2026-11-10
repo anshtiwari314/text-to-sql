@@ -71,7 +71,7 @@ Landing **Sign in** / **Get Started** links → `/auth`. After OAuth or email lo
 - **Chat** → New Chat, History
 - **Database** → **Configuration** (data source cards, add/edit), **Schemas** (table browser)
 
-**Configuration** (`db_list`, `DatabaseList.tsx`): cards open connection editor; no schema dropdown on cards.
+**Configuration** (`db_list`, `DatabaseList.tsx`): cards open connection editor; no schema dropdown on cards. Add/edit connection supports **Individual fields** or **Connection URL** (`client/lib/parseDatabaseUrl.ts` → `POST|PUT /api/databases` with `connection_url`).
 
 **Schemas** (`db_schemas`, `DatabaseSchemasView.tsx`): DB cards → Flask `/api/schema` → `parseSchemaDdl` → **table dropdown** + CREATE TABLE DDL per table.
 
@@ -120,7 +120,7 @@ flowchart LR
 ## Reference: course agent.py
 
 - Path: `~/Desktop/practise-and-make/Ai-course/3-text-to-sql/agent.py`
-- MySQL host `192.168.1.42:5246`, database **`w3schools`** (not `mysql` system DB).
+- MySQL host `192.168.1.42:5246`, database **`w3schools`** (not `mysql` system DB). Tunnel check: `server/scripts/verify_mysql_connection.py` (ngrok port from UI changes each restart).
 - Saved connection in app must match: engine **MySQL**, `db_name=w3schools`.
 
 ## Known pitfalls (resolved)

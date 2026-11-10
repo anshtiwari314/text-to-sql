@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getRequestUser } from '@/lib/getRequestUser';
+import { resolveDatabaseConnection } from '@/lib/resolveDatabaseConnection';
 
 export async function GET(req: Request) {
   const user = await getRequestUser(req);
@@ -20,6 +21,7 @@ export async function GET(req: Request) {
         host, 
         port, 
         db_name,
+        db_username,
         read_only
       FROM saved_databases 
       WHERE user_id = $1`,
@@ -49,10 +51,15 @@ export async function POST(req: Request) {
 
   try {
     const data = await req.json();
-    // The form sends conn_name - the same name the table uses.
-    const { conn_name, engine, host, port, db_username, db_password, db_name } = data;
+    let resolved;
+    try {
+      resolved = resolveDatabaseConnection(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Invalid connection details";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+    const { conn_name, engine, host, port, db_username, db_password, db_name } = resolved;
 
-    // 2. Save to database using the pg pool
     const result = await query(
       `INSERT INTO saved_databases 
       (user_id, conn_name, engine, host, port, db_username, db_password, db_name) 

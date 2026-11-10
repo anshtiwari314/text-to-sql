@@ -46,6 +46,8 @@ def fetch_schema(conn):
     """
     engine = _make_engine(conn)
 
+    host, port = conn.get("host"), conn.get("port")
+    logger.info("fetch_schema dial %s:%s engine=%s db=%r", host, port, conn["engine"], conn.get("database"))
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -54,7 +56,11 @@ def fetch_schema(conn):
             logger.warning("fetch_schema: DDL reflect empty for engine=%s db=%r", conn["engine"], conn.get("database"))
         return schema_text
     except SQLAlchemyError as error:
-        raise ConnectionError(f"Could not connect to the database: {error}") from error
+        hint = ""
+        if host and "ngrok" in str(host).lower() and port in (3306, "3306", None, ""):
+            hint = " (ngrok needs the public port from the ngrok UI, not 3306)"
+        logger.error("fetch_schema failed %s:%s — %s", host, port, error)
+        raise ConnectionError(f"Could not connect to the database at {host}:{port}{hint}: {error}") from error
     finally:
         engine.dispose()
 

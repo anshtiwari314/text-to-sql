@@ -27,6 +27,7 @@ export interface DatabaseConnection {
   host: string;
   port?: number;
   db_name?: string;
+  db_username?: string;
   readOnly: boolean;
 }
 export type ChatRole = "user" | "ai";

@@ -35,7 +35,7 @@ services:
       - ./client/.env
     environment:
       # Overrides localhost URLs from client/.env for the Docker network.
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@127.0.0.1:5432/${POSTGRES_DB:-text-to-sql}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-text-to-sql}
       FLASK_URL: http://server:8000
     ports:
       - "3000:3000"

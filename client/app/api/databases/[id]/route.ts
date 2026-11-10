@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getRequestUser } from '@/lib/getRequestUser';
+import { resolveDatabaseConnectionUpdate } from '@/lib/resolveDatabaseConnection';
 
 /**
  * Update an existing connection's configuration (/api/databases/[id]).
@@ -15,7 +16,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   try {
     const { id } = await params;
-    const { conn_name, engine, host, port, db_name, db_username, db_password } = await req.json();
+    const body = await req.json();
+    let resolved;
+    try {
+      resolved = resolveDatabaseConnectionUpdate(body);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Invalid connection details";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
+    const { conn_name, engine, host, port, db_name, db_username, db_password, fromUrl } = resolved;
 
     const result = await query(
       `UPDATE saved_databases SET
@@ -25,7 +35,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
          port        = COALESCE($6, port),
          db_name     = COALESCE($7, db_name),
          db_username = COALESCE($8, db_username),
-         db_password = COALESCE($9, db_password)
+         db_password = CASE WHEN $10 THEN $9 ELSE COALESCE($9, db_password) END
        WHERE id = $1 AND user_id = $2
        RETURNING id, conn_name, engine, host, port, db_name`,
       [
@@ -37,7 +47,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         port ?? null,
         db_name ?? null,
         db_username ?? null,
-        db_password ? db_password : null, // not empty -> update the password
+        fromUrl ? db_password : db_password ? db_password : null,
+        fromUrl,
       ]
     );
 
